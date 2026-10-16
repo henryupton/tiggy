@@ -1,0 +1,305 @@
+{
+    "exportFormatVersion": 2,
+    "exportTime": "2026-10-16 12:00:00",
+    "containerVersion": {
+        "path": "accounts/1/containers/100/versions/0",
+        "accountId": "1",
+        "containerId": "100",
+        "containerVersionId": "0",
+        "container": {
+            "path": "accounts/1/containers/100",
+            "accountId": "1",
+            "containerId": "100",
+            "name": "Example - Broken",
+            "publicId": "GTM-EXAMPLE",
+            "usageContext": [
+                "WEB"
+            ]
+        },
+        "tag": [
+            {
+                "accountId": "1",
+                "containerId": "100",
+                "tagId": "1",
+                "name": "GA4 - Google Tag",
+                "type": "googtag",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "tagId",
+                        "value": "G-EXAMPLE"
+                    }
+                ],
+                "firingTriggerId": [
+                    "2147479573"
+                ],
+                "tagFiringOption": "ONCE_PER_EVENT"
+            },
+            {
+                "accountId": "1",
+                "containerId": "100",
+                "tagId": "2",
+                "name": "GA4 - promotion_viewed",
+                "type": "gaawe",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "eventName",
+                        "value": "promotion_viewed"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "measurementIdOverride",
+                        "value": "G-EXAMPLE"
+                    },
+                    {
+                        "type": "LIST",
+                        "key": "eventSettingsTable",
+                        "list": [
+                            {
+                                "type": "MAP",
+                                "map": [
+                                    {
+                                        "type": "TEMPLATE",
+                                        "key": "parameter",
+                                        "value": "promotion_id"
+                                    },
+                                    {
+                                        "type": "TEMPLATE",
+                                        "key": "parameterValue",
+                                        "value": "{{DLV - event_attributes.promotion_id}}"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "MAP",
+                                "map": [
+                                    {
+                                        "type": "TEMPLATE",
+                                        "key": "parameter",
+                                        "value": "page_path"
+                                    },
+                                    {
+                                        "type": "TEMPLATE",
+                                        "key": "parameterValue",
+                                        "value": "{{Page Path}}"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "MAP",
+                                "map": [
+                                    {
+                                        "type": "TEMPLATE",
+                                        "key": "parameter",
+                                        "value": "promotion_name"
+                                    },
+                                    {
+                                        "type": "TEMPLATE",
+                                        "key": "parameterValue",
+                                        "value": "{{DLV - event_attributes.promo_name}}"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "firingTriggerId": [
+                    "9"
+                ],
+                "setupTag": [
+                    {
+                        "tagName": "GA4 - Google Tg"
+                    }
+                ],
+                "tagFiringOption": "ONCE_PER_EVENT"
+            },
+            {
+                "accountId": "1",
+                "containerId": "100",
+                "tagId": "3",
+                "name": "Amplitude - promotion_viewed",
+                "type": "cvt_100_7",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "eventType",
+                        "value": "promotion_viewed"
+                    }
+                ],
+                "firingTriggerId": [
+                    "4"
+                ],
+                "tagFiringOption": "ONCE_PER_EVENT",
+                "consentSettings": {
+                    "consentStatus": "NEEDED",
+                    "consentType": {
+                        "type": "LIST",
+                        "list": [
+                            {
+                                "type": "TEMPLATE",
+                                "value": "analytics_storage"
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "accountId": "1",
+                "containerId": "100",
+                "tagId": "5",
+                "name": "HTML - old survey",
+                "type": "html",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "html",
+                        "value": "<script>console.log({{CJS - survey id}})</script>"
+                    }
+                ],
+                "tagFiringOption": "ONCE_PER_EVENT",
+                "priority": {
+                    "type": "INTEGER",
+                    "value": "10"
+                },
+                "abTestBucket": "b"
+            }
+        ],
+        "trigger": [
+            {
+                "accountId": "1",
+                "containerId": "100",
+                "triggerId": "4",
+                "name": "CE - promotion_viewed",
+                "type": "CUSTOM_EVENT",
+                "customEventFilter": [
+                    {
+                        "type": "EQUALS",
+                        "parameter": [
+                            {
+                                "type": "TEMPLATE",
+                                "key": "arg0",
+                                "value": "{{_event}}"
+                            },
+                            {
+                                "type": "TEMPLATE",
+                                "key": "arg1",
+                                "value": "promotion_viewed"
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "accountId": "1",
+                "containerId": "100",
+                "triggerId": "6",
+                "name": "CE - old_checkout",
+                "type": "CUSTOM_EVENT",
+                "customEventFilter": [
+                    {
+                        "type": "EQUALS",
+                        "parameter": [
+                            {
+                                "type": "TEMPLATE",
+                                "key": "arg0",
+                                "value": "{{_event}}"
+                            },
+                            {
+                                "type": "TEMPLATE",
+                                "key": "arg1",
+                                "value": "checkout"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "variable": [
+            {
+                "accountId": "1",
+                "containerId": "100",
+                "variableId": "10",
+                "name": "DLV - event_attributes.promotion_id",
+                "type": "v",
+                "parameter": [
+                    {
+                        "type": "INTEGER",
+                        "key": "dataLayerVersion",
+                        "value": "2"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "setDefaultValue",
+                        "value": "false"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "name",
+                        "value": "event_attributes.promotion_id"
+                    }
+                ]
+            },
+            {
+                "accountId": "1",
+                "containerId": "100",
+                "variableId": "11",
+                "name": "DLV - event_attributes.promotion_name",
+                "type": "v",
+                "parameter": [
+                    {
+                        "type": "INTEGER",
+                        "key": "dataLayerVersion",
+                        "value": "2"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "setDefaultValue",
+                        "value": "false"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "name",
+                        "value": "event_attributes.promotion_name"
+                    }
+                ]
+            },
+            {
+                "accountId": "1",
+                "containerId": "100",
+                "variableId": "12",
+                "name": "CJS - survey id",
+                "type": "jsm",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "javascript",
+                        "value": "function(){ return {{CJS - survey seed}}; }"
+                    }
+                ]
+            },
+            {
+                "accountId": "1",
+                "containerId": "100",
+                "variableId": "13",
+                "name": "CJS - survey seed",
+                "type": "jsm",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "javascript",
+                        "value": "function(){ return {{CJS - survey id}} || 1; }"
+                    }
+                ]
+            }
+        ],
+        "builtInVariable": [
+            {
+                "accountId": "1",
+                "containerId": "100",
+                "type": "EVENT",
+                "name": "Event"
+            }
+        ]
+    }
+}
