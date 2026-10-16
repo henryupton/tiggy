@@ -1,5 +1,5 @@
 [project]
-name = "gotham"
+name = "tiggy-cli"
 version = "0.0.1"
 description = "Declarative Google Tag Manager: validate, plan and apply GTM containers from a YAML spec."
 readme = "README.md"
@@ -18,11 +18,14 @@ classifiers = [
 ]
 
 [project.urls]
-Repository = "https://github.com/henryupton/gotham"
+Repository = "https://github.com/henryupton/tiggy"
 
 [project.scripts]
-gotham = "gotham.cli:cli"
+tiggy = "tiggy.cli:cli"
 
 [build-system]
 requires = ["uv_build>=0.10.9,<0.11.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "tiggy"

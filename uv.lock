@@ -12,7 +12,7 @@ wheels = [
 ]
 
 [[package]]
-name = "gotham"
+name = "tiggy-cli"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
