@@ -1,0 +1,28 @@
+[project]
+name = "gotham"
+version = "0.0.1"
+description = "Declarative Google Tag Manager: validate, plan and apply GTM containers from a YAML spec."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Henry Upton", email = "henryupton@gmail.com" }]
+requires-python = ">=3.11"
+dependencies = ["click>=8.1"]
+keywords = ["google-tag-manager", "gtm", "infrastructure-as-code", "declarative"]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Internet :: WWW/HTTP :: Site Management",
+]
+
+[project.urls]
+Repository = "https://github.com/henryupton/gotham"
+
+[project.scripts]
+gotham = "gotham.cli:cli"
+
+[build-system]
+requires = ["uv_build>=0.10.9,<0.11.0"]
+build-backend = "uv_build"
