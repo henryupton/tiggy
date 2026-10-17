@@ -1,5 +1,8 @@
 """What GTM provides without a resource to back it: built-in variable names and trigger IDs."""
 
+import re
+from typing import Any
+
 from tiggy.gtm.resources import BuiltInVariableType as B
 
 # Display names as they appear in exports. Partial by design: only pairs seen in real exports,
@@ -55,6 +58,7 @@ VARIABLE_NAMES: dict[B, str] = {
 
 # Triggers every web container has. GTM reserves IDs from FIRST_TRIGGER_ID up for them.
 FIRST_TRIGGER_ID = 2147479553
+DIGITS = re.compile(r"[0-9]+")
 TRIGGER_NAMES: dict[str, str] = {
     "2147479553": "All Pages",
     "2147479572": "Consent Initialization - All Pages",
@@ -62,8 +66,14 @@ TRIGGER_NAMES: dict[str, str] = {
 }
 
 
-def is_trigger_id(trigger_id: str) -> bool:
-    return trigger_id.isdigit() and int(trigger_id) >= FIRST_TRIGGER_ID
+def is_trigger_id(trigger_id: Any) -> bool:
+    """Whether an ID is in the block GTM reserves for built-in triggers, the top of the 32-bit range."""
+    return (
+        isinstance(trigger_id, str)
+        and len(trigger_id) <= 10
+        and DIGITS.fullmatch(trigger_id) is not None
+        and FIRST_TRIGGER_ID <= int(trigger_id) < 2**31
+    )
 
 
 def trigger_name(trigger_id: str) -> str:

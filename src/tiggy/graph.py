@@ -86,8 +86,10 @@ class Reference:
 
 
 class ContainerGraph:
-    def __init__(self, version: ContainerVersion):
+    def __init__(self, version: ContainerVersion, labels: dict[tuple[Kind, str], str] | None = None):
+        """`labels` names objects GTM leaves unnamed (gtag configs), keyed by kind and ID."""
         self.version = version
+        self.labels = labels or {}
         self.nodes: list[Node] = []
         self.references: list[Reference] = []
         self._by_id: dict[tuple[Kind, str], Node] = {}
@@ -120,7 +122,12 @@ class ContainerGraph:
 
     def _add(self, kind: Kind, resource: GtmModel, id_attr: str | None) -> Node:
         node_id = getattr(resource, id_attr) if id_attr else None
-        name = getattr(resource, "name", None) or node_id or "(unnamed)"
+        name = getattr(resource, "name", None)
+        name = name if isinstance(name, str) else None  # unmodelled on some kinds, so any JSON value
+        name = name or self.labels.get((kind, node_id or "")) or node_id
+        if not name and isinstance(resource, BuiltInVariable) and resource.type:
+            name = builtins.VARIABLE_NAMES.get(resource.type, resource.type.export_value)
+        name = name or "(unnamed)"
         node = Node(kind, name, node_id, resource)
         self.nodes.append(node)
         if node_id:
@@ -140,11 +147,16 @@ class ContainerGraph:
         if legacy is None:
             return
         self.built_ins_listed = True
-        for raw in legacy:
-            built_in = BuiltInVariableType(raw)
-            name = builtins.VARIABLE_NAMES.get(built_in, built_in.value)
+        for raw in legacy if isinstance(legacy, list) else [legacy]:
+            try:
+                built_in = BuiltInVariableType(raw)
+            except ValueError:
+                name, resource = str(raw), BuiltInVariable(name=str(raw))
+            else:
+                name = builtins.VARIABLE_NAMES.get(built_in, built_in.value)
+                resource = BuiltInVariable(type=built_in, name=name)
             if (Kind.BUILT_IN_VARIABLE, name) not in self._by_name:
-                self._add(Kind.BUILT_IN_VARIABLE, BuiltInVariable(type=built_in, name=name), None)
+                self._add(Kind.BUILT_IN_VARIABLE, resource, None)
 
     def _extract(self, node: Node) -> Iterator[Reference]:
         resource = node.resource

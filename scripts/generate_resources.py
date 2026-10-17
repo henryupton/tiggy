@@ -16,6 +16,9 @@ import sys
 import urllib.request
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from tiggy.gtm.base import DIGIT_SPELLINGS  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 DISCOVERY = ROOT / "schema" / "tagmanager-v2.discovery.json"
 OUTPUT = ROOT / "src" / "tiggy" / "gtm" / "resources.py"
@@ -87,6 +90,8 @@ class Generator:
             return name
         if kind == "object" and isinstance(spec.get("additionalProperties"), dict):
             return f"dict[str, {self.annotation(schema, prop, spec['additionalProperties'])}]"
+        if kind == "integer" and spec.get("format") == "int32":
+            return "Int32"
         return {"string": "str", "integer": "int", "boolean": "bool", "number": "float"}.get(kind, "Any")
 
     def model(self, name: str) -> str:
@@ -112,6 +117,14 @@ class Generator:
         names = closure(self.schemas)
         models = [self.model(n) for n in names]
         enums = [self.enum(n, m) for n, m in sorted(self.enums.items())]
+        unspelled = sorted(
+            v
+            for members in self.enums.values()
+            for v, _ in members
+            if re.search(r"[0-9]", v) and v not in DIGIT_SPELLINGS
+        )
+        if unspelled:
+            sys.exit(f"add the export spelling of {unspelled} to DIGIT_SPELLINGS in src/tiggy/gtm/base.py")
         revision = self.discovery.get("revision")
         header = (
             f'"""GTM resource models, generated from the Tag Manager API v2 discovery document '
@@ -121,7 +134,7 @@ class Generator:
         imports = (
             "from __future__ import annotations\n\n"
             + ("from typing import Any\n\n" if uses_any else "")
-            + "from pydantic import Field\n\nfrom tiggy.gtm.base import GtmEnum, GtmModel"
+            + "from pydantic import Field\n\nfrom tiggy.gtm.base import GtmEnum, GtmModel, Int32"
         )
         rebuild = "\n".join(f"{n}.model_rebuild()" for n in names)
         return "\n\n\n".join([header, imports, *enums, *models, rebuild]) + "\n"

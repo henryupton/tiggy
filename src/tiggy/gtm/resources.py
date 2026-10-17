@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pydantic import Field
 
-from tiggy.gtm.base import GtmEnum, GtmModel
+from tiggy.gtm.base import GtmEnum, GtmModel, Int32
 
 
 class BuiltInVariableType(GtmEnum):
@@ -776,7 +776,7 @@ class Client(GtmModel):
         None, alias="clientId", description="The Client ID uniquely identifies the GTM client."
     )
     parameter: list[Parameter] | None = Field(None, alias="parameter", description="The client's parameters.")
-    priority: int | None = Field(
+    priority: Int32 | None = Field(
         None, alias="priority", description="Priority determines relative firing order."
     )
     fingerprint: str | None = Field(

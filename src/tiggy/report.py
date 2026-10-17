@@ -9,7 +9,10 @@ from tiggy.checks import Finding, Severity
 from tiggy.graph import ContainerGraph, Kind, Node
 
 MARKS = {Severity.ERROR: ("✗", "red"), Severity.WARNING: ("⚠", "yellow")}
-SUMMARY_KINDS = (Kind.TAG, Kind.TRIGGER, Kind.VARIABLE, Kind.TEMPLATE, Kind.CLIENT, Kind.TRANSFORMATION)
+SUMMARY_KINDS = (
+    Kind.TAG, Kind.TRIGGER, Kind.VARIABLE, Kind.TEMPLATE, Kind.CLIENT, Kind.TRANSFORMATION, Kind.ZONE,
+    Kind.GTAG_CONFIG,
+)  # fmt: skip
 
 
 def _container(graph: ContainerGraph) -> dict[str, str | None]:
@@ -32,26 +35,44 @@ def _tally(findings: list[Finding]) -> dict[str, int]:
     }
 
 
+def printable(text: str) -> str:
+    """Text safe for a terminal: control characters, newlines too, escaped so a name can't forge output."""
+    return "".join(c if c.isprintable() else c.encode("unicode_escape").decode() for c in text)
+
+
 def _plural(n: int, word: str) -> str:
     return f"{n} {word}{'' if n == 1 else 's'}"
 
 
-def text(graph: ContainerGraph, findings: list[Finding]) -> str:
+def text(
+    graph: ContainerGraph,
+    findings: list[Finding],
+    locations: dict[Node, str] | None = None,
+    files: list[str] | None = None,
+) -> str:
+    """`files` are warnings about the spec's files rather than its objects, already located."""
     meta = _container(graph)
     counts = ", ".join(_plural(n, k) for k, n in _counts(graph).items())
-    title = f"{meta['name'] or 'Container'} ({meta['publicId'] or 'no public ID'})"
-    lines = [click.style(title, bold=True) + f", version {meta['version']}: {counts}", ""]
+    title = meta["name"] or "Container"
+    if meta["publicId"]:
+        title += f" ({meta['publicId']}), version {meta['version']}"
+    lines = [click.style(printable(title), bold=True) + (f": {counts}" if counts else ""), ""]
+    locations = locations or {}
     by_node: dict[Node, list[Finding]] = defaultdict(list)
     for f in findings:
         by_node[f.node].append(f)
     for node, group in by_node.items():
         worst = Severity.ERROR if any(f.severity is Severity.ERROR for f in group) else Severity.WARNING
         mark, colour = MARKS[worst]
-        lines.append(f"{click.style(mark, fg=colour)} {node}")
+        where = f"  {click.style(printable(locations[node]), dim=True)}" if node in locations else ""
+        lines.append(f"{click.style(mark, fg=colour)} {printable(str(node))}{where}")
         for f in group:
-            lines.append(f"    {f.message}  {click.style(f'[{f.rule}]', dim=True)}")
+            lines.append(f"    {printable(f.message)}  {click.style(f'[{f.rule}]', dim=True)}")
+    mark, colour = MARKS[Severity.WARNING]
+    lines.extend(f"{click.style(mark, fg=colour)} {printable(warning)}" for warning in files or [])
     tally = _tally(findings)
-    if findings:
+    tally["warnings"] += len(files or [])
+    if findings or files:
         lines.append("")
     summary = f"{_plural(tally['errors'], 'error')}, {_plural(tally['warnings'], 'warning')}"
     lines.append(
@@ -60,11 +81,20 @@ def text(graph: ContainerGraph, findings: list[Finding]) -> str:
     return "\n".join(lines)
 
 
-def as_json(graph: ContainerGraph, findings: list[Finding]) -> str:
+def as_json(
+    graph: ContainerGraph,
+    findings: list[Finding],
+    locations: dict[Node, str] | None = None,
+    files: list[str] | None = None,
+) -> str:
+    locations = locations or {}
+    tally = _tally(findings)
+    tally["warnings"] += len(files or [])
     payload = {
         "container": _container(graph),
         "counts": _counts(graph),
-        "summary": _tally(findings),
+        "summary": tally,
+        "files": files or [],
         "findings": [
             {
                 "rule": f.rule,
@@ -73,6 +103,7 @@ def as_json(graph: ContainerGraph, findings: list[Finding]) -> str:
                 "name": f.node.name,
                 "id": f.node.id,
                 "message": f.message,
+                "location": locations.get(f.node),
             }
             for f in findings
         ],

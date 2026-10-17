@@ -10,6 +10,7 @@ requires-python = ">=3.11"
 dependencies = [
     "click>=8.1",
     "pydantic>=2.9",
+    "ruamel-yaml>=0.18,<0.20",
 ]
 keywords = ["google-tag-manager", "gtm", "infrastructure-as-code", "declarative"]
 classifiers = [
@@ -24,7 +25,7 @@ classifiers = [
 Repository = "https://github.com/henryupton/tiggy"
 
 [project.scripts]
-tiggy = "tiggy.cli:cli"
+tiggy = "tiggy.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.10.9,<0.11.0"]
