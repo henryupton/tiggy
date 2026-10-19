@@ -1,0 +1,28 @@
+tiggy: 1
+tags:
+  - name: HTML - first-party POST
+    type: html
+    folder: First-party
+    firing_triggers:
+      - CE - track_event
+    teardown_tag:
+      - tag_name: HTML - reset event_attributes
+        stop_teardown_on_failure: false
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    notes: Posts CJS - first-party payload to the collector on every track_event.
+    parameter:
+      html: {$file: folders/first-party/html-first-party-post.html}
+      supportDocumentWrite: false
+  - name: HTML - reset event_attributes
+    type: html
+    folder: First-party
+    tag_firing_option: UNLIMITED
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      html: {$file: folders/first-party/html-reset-event-attributes.html}
+      supportDocumentWrite: false

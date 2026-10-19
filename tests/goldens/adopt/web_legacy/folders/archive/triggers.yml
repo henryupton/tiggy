@@ -1,0 +1,11 @@
+tiggy: 1
+triggers:
+  - name: CE - checkout_step (old)
+    type: CUSTOM_EVENT
+    folder: Archive
+    custom_event_filter:
+      - type: EQUALS
+        parameter:
+          arg0: '{{_event}}'
+          arg1: checkout_step
+    notes: 'Fired the old checkout funnel tags, all deleted since.'

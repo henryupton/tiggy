@@ -8,3 +8,7 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Test runs
+.pytest_cache/
+.hypothesis/

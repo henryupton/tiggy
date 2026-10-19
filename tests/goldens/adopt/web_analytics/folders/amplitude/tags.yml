@@ -1,0 +1,64 @@
+tiggy: 1
+tags:
+  - name: Amplitude - track_event
+    type: {template: Amplitude Event}
+    folder: Amplitude
+    firing_triggers:
+      - CE - track_event
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      eventType: '{{DLV - event_name}}'
+      eventProperties:
+        - name: build_number
+          value: '{{DLV - event_attributes.build_number}}'
+        - name: download_format
+          value: '{{DLV - event_attributes.download_format}}'
+        - name: element_text
+          value: '{{DLV - event_attributes.element_text}}'
+        - name: environment
+          value: '{{DLV - event_attributes.environment}}'
+        - name: item_brand
+          value: '{{DLV - event_attributes.item_brand}}'
+        - name: item_category
+          value: '{{DLV - event_attributes.item_category}}'
+        - name: item_category2
+          value: '{{DLV - event_attributes.item_category2}}'
+        - name: item_id
+          value: '{{DLV - event_attributes.item_id}}'
+        - name: item_name
+          value: '{{DLV - event_attributes.item_name}}'
+        - name: item_variant
+          value: '{{DLV - event_attributes.item_variant}}'
+        - name: license_type
+          value: '{{DLV - event_attributes.license_type}}'
+        - name: link_url
+          value: '{{DLV - event_attributes.link_url}}'
+        - name: list_name
+          value: '{{DLV - event_attributes.list_name}}'
+        - name: method
+          value: '{{DLV - event_attributes.method}}'
+        - name: page_section
+          value: '{{DLV - event_attributes.page_section}}'
+        - name: page_template
+          value: '{{DLV - event_attributes.page_template}}'
+        - name: plan_name
+          value: '{{DLV - event_attributes.plan_name}}'
+        - name: platform
+          value: '{{DLV - event_attributes.platform}}'
+        - name: search_filters
+          value: '{{DLV - event_attributes.search_filters}}'
+        - name: search_results_count
+          value: '{{DLV - event_attributes.search_results_count}}'
+        - name: search_term
+          value: '{{DLV - event_attributes.search_term}}'
+        - name: site_language
+          value: '{{DLV - event_attributes.site_language}}'
+        - name: sort_order
+          value: '{{DLV - event_attributes.sort_order}}'
+        - name: user_logged_in
+          value: '{{DLV - event_attributes.user_logged_in}}'
+        - name: wishlist_id
+          value: '{{DLV - event_attributes.wishlist_id}}'

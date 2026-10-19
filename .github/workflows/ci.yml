@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+
+  test:
+    name: test (${{ matrix.os }}, ${{ matrix.python }}${{ matrix.resolution == 'lowest-direct' && ', lowest deps' || '' }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The oldest Python and dependency versions pyproject allows.
+          - { os: ubuntu-latest, python: "3.11", resolution: lowest-direct }
+          # What the adopting repo's CI runs.
+          - { os: ubuntu-latest, python: "3.13", resolution: locked }
+          - { os: macos-latest, python: "3.13", resolution: locked }
+          - { os: windows-latest, python: "3.13", resolution: locked }
+    env:
+      UV_PYTHON: ${{ matrix.python }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+
+      - if: matrix.resolution == 'locked'
+        run: uv sync --locked
+      - if: matrix.resolution == 'lowest-direct'
+        run: uv sync --resolution lowest-direct
+
+      - name: Tests (slow ones included)
+        run: uv run pytest

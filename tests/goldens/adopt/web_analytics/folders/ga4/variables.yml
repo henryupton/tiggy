@@ -1,0 +1,8 @@
+tiggy: 1
+variables:
+  - name: C - GA4 measurement ID
+    type: c
+    folder: GA4
+    format_value: {}
+    parameter:
+      value: G-TEST000001

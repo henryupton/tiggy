@@ -1,0 +1,8 @@
+tiggy: 1
+variables:
+  - name: C - Google Ads conversion ID
+    type: c
+    folder: Google Ads
+    format_value: {}
+    parameter:
+      value: '000000001'

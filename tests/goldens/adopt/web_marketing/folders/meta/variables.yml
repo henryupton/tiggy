@@ -1,0 +1,8 @@
+tiggy: 1
+variables:
+  - name: C - Meta pixel ID
+    type: c
+    folder: Meta
+    format_value: {}
+    parameter:
+      value: '000000000000001'

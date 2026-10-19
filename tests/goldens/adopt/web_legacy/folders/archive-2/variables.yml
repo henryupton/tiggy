@@ -1,0 +1,11 @@
+tiggy: 1
+variables:
+  - name: DLV - promoCode (old)
+    type: v
+    folder: archive
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: true
+      defaultValue: none
+      name: promoCode

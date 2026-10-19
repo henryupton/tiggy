@@ -1,0 +1,10 @@
+tiggy: 1
+variables:
+  - name: Catégorie de page
+    type: v
+    folder: Données personnelles
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: page.category

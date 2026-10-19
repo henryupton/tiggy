@@ -1,0 +1,20 @@
+tiggy: 1
+tags:
+  - name: LinkedIn - Insight
+    type: html
+    folder: LinkedIn
+    firing_triggers:
+      - CE - cookie_consent_marketing
+    blocking_triggers:
+      - Block - internal traffic
+    paused: true
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NEEDED
+      consent_type:
+        - ad_storage
+    monitoring_metadata: {$type: MAP}
+    notes: Paused until the partner ID is confirmed.
+    parameter:
+      html: {$file: folders/linkedin/linkedin-insight.html}
+      supportDocumentWrite: false

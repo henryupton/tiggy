@@ -1,0 +1,986 @@
+{
+    "exportFormatVersion": 2,
+    "exportTime": "2026-10-19 09:30:00",
+    "containerVersion": {
+        "path": "accounts/1000/containers/102/versions/0",
+        "accountId": "1000",
+        "containerId": "102",
+        "containerVersionId": "0",
+        "container": {
+            "path": "accounts/1000/containers/102",
+            "accountId": "1000",
+            "containerId": "102",
+            "name": "Example - Marketing",
+            "publicId": "GTM-TEST002",
+            "usageContext": [
+                "WEB"
+            ],
+            "notes": "Loaded after consent (cookie_consent_marketing).",
+            "fingerprint": "1759300000000",
+            "tagManagerUrl": "https://tagmanager.google.com/#/container/accounts/1000/containers/102/workspaces?apiLink=container",
+            "features": {
+                "supportUserPermissions": true,
+                "supportEnvironments": true,
+                "supportWorkspaces": true,
+                "supportGtagConfigs": false,
+                "supportBuiltInVariables": true,
+                "supportClients": false,
+                "supportFolders": true,
+                "supportTags": true,
+                "supportTemplates": true,
+                "supportTriggers": true,
+                "supportVariables": true,
+                "supportVersions": true,
+                "supportZones": true,
+                "supportTransformations": false
+            },
+            "tagIds": [
+                "GTM-TEST002"
+            ]
+        },
+        "tag": [
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "tagId": "19",
+                "name": "Meta - Pixel - Base",
+                "type": "cvt_T3STP",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "pixelId",
+                        "value": "{{C - Meta pixel ID}}"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "eventName",
+                        "value": "standard"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "standardEventName",
+                        "value": "PageView"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "consent",
+                        "value": "true"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "advancedMatching",
+                        "value": "false"
+                    }
+                ],
+                "fingerprint": "1760941852833",
+                "firingTriggerId": [
+                    "15"
+                ],
+                "blockingTriggerId": [
+                    "18"
+                ],
+                "parentFolderId": "4",
+                "tagFiringOption": "ONCE_PER_LOAD",
+                "monitoringMetadata": {
+                    "type": "MAP"
+                },
+                "consentSettings": {
+                    "consentStatus": "NEEDED",
+                    "consentType": {
+                        "type": "LIST",
+                        "list": [
+                            {
+                                "type": "TEMPLATE",
+                                "value": "ad_storage"
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "tagId": "20",
+                "name": "Meta - Pixel - Purchase",
+                "type": "cvt_T3STP",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "pixelId",
+                        "value": "{{C - Meta pixel ID}}"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "eventName",
+                        "value": "standard"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "standardEventName",
+                        "value": "Purchase"
+                    },
+                    {
+                        "type": "LIST",
+                        "key": "objectPropertyList",
+                        "list": [
+                            {
+                                "type": "MAP",
+                                "map": [
+                                    {
+                                        "type": "TEMPLATE",
+                                        "key": "name",
+                                        "value": "value"
+                                    },
+                                    {
+                                        "type": "TEMPLATE",
+                                        "key": "value",
+                                        "value": "{{DLV - ecommerce.value}}"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "MAP",
+                                "map": [
+                                    {
+                                        "type": "TEMPLATE",
+                                        "key": "name",
+                                        "value": "currency"
+                                    },
+                                    {
+                                        "type": "TEMPLATE",
+                                        "key": "value",
+                                        "value": "{{DLV - ecommerce.currency}}"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "consent",
+                        "value": "true"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "advancedMatching",
+                        "value": "false"
+                    }
+                ],
+                "fingerprint": "1761028266140",
+                "firingTriggerId": [
+                    "16"
+                ],
+                "blockingTriggerId": [
+                    "18"
+                ],
+                "setupTag": [
+                    {
+                        "tagName": "Meta - Pixel - Base",
+                        "stopOnSetupFailure": true
+                    }
+                ],
+                "parentFolderId": "4",
+                "tagFiringOption": "ONCE_PER_EVENT",
+                "monitoringMetadata": {
+                    "type": "MAP"
+                },
+                "consentSettings": {
+                    "consentStatus": "NEEDED",
+                    "consentType": {
+                        "type": "LIST",
+                        "list": [
+                            {
+                                "type": "TEMPLATE",
+                                "value": "ad_storage"
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "tagId": "21",
+                "name": "Meta - Pixel - CompleteRegistration",
+                "type": "cvt_T3STP",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "pixelId",
+                        "value": "{{C - Meta pixel ID}}"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "eventName",
+                        "value": "standard"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "standardEventName",
+                        "value": "CompleteRegistration"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "consent",
+                        "value": "true"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "advancedMatching",
+                        "value": "false"
+                    }
+                ],
+                "fingerprint": "1761114679447",
+                "firingTriggerId": [
+                    "17"
+                ],
+                "blockingTriggerId": [
+                    "18"
+                ],
+                "parentFolderId": "4",
+                "tagFiringOption": "ONCE_PER_EVENT",
+                "monitoringMetadata": {
+                    "type": "MAP"
+                },
+                "consentSettings": {
+                    "consentStatus": "NEEDED",
+                    "consentType": {
+                        "type": "LIST",
+                        "list": [
+                            {
+                                "type": "TEMPLATE",
+                                "value": "ad_storage"
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "tagId": "22",
+                "name": "Microsoft Ads - UET base",
+                "type": "html",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "html",
+                        "value": "<script>\n  (function (w, d, src) {\n    w.uetq = w.uetq || [];  \n    var s = d.createElement('script');\n    s.async = true;\n    s.src = src;\n    s.onload = function () {\n      var queue = new w.UET({ti: '{{C - Microsoft UET tag ID}}', q: w.uetq});\n      w.uetq = queue;\n      w.uetq.push('pageLoad');\n    };\n    d.head.appendChild(s);\n  })(window, document, 'https://uet.example.net/bat.js');\n</script>\n"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "supportDocumentWrite",
+                        "value": "false"
+                    }
+                ],
+                "fingerprint": "1761201092754",
+                "firingTriggerId": [
+                    "15"
+                ],
+                "blockingTriggerId": [
+                    "18"
+                ],
+                "parentFolderId": "5",
+                "tagFiringOption": "ONCE_PER_EVENT",
+                "monitoringMetadata": {
+                    "type": "MAP"
+                },
+                "consentSettings": {
+                    "consentStatus": "NEEDED",
+                    "consentType": {
+                        "type": "LIST",
+                        "list": [
+                            {
+                                "type": "TEMPLATE",
+                                "value": "ad_storage"
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "tagId": "23",
+                "name": "Microsoft Ads - UET purchase",
+                "type": "html",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "html",
+                        "value": "<script>\n  window.uetq = window.uetq || [];\n  window.uetq.push('event', 'purchase', {\n    revenue_value: {{DLV - ecommerce.value}},\n    currency: '{{DLV - ecommerce.currency}}'\n  });\n</script>\n"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "supportDocumentWrite",
+                        "value": "false"
+                    }
+                ],
+                "fingerprint": "1761287506061",
+                "firingTriggerId": [
+                    "16"
+                ],
+                "blockingTriggerId": [
+                    "18"
+                ],
+                "parentFolderId": "5",
+                "tagFiringOption": "ONCE_PER_EVENT",
+                "monitoringMetadata": {
+                    "type": "MAP"
+                },
+                "consentSettings": {
+                    "consentStatus": "NEEDED",
+                    "consentType": {
+                        "type": "LIST",
+                        "list": [
+                            {
+                                "type": "TEMPLATE",
+                                "value": "ad_storage"
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "tagId": "24",
+                "name": "LinkedIn - Insight",
+                "type": "html",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "html",
+                        "value": "<script>\n  window._linkedin_partner_id = '{{C - LinkedIn partner ID}}';\n  window._linkedin_data_partner_ids = window._linkedin_data_partner_ids || [];\n  window._linkedin_data_partner_ids.push(window._linkedin_partner_id);\n  (function (d) {\n    var s = d.createElement('script');\n    s.async = true;\n    s.src = 'https://insight.example.net/insight.min.js';\n    d.head.appendChild(s);\n  })(document);\n</script>\n"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "supportDocumentWrite",
+                        "value": "false"
+                    }
+                ],
+                "notes": "Paused until the partner ID is confirmed.",
+                "fingerprint": "1761373919368",
+                "firingTriggerId": [
+                    "15"
+                ],
+                "blockingTriggerId": [
+                    "18"
+                ],
+                "parentFolderId": "3",
+                "paused": true,
+                "tagFiringOption": "ONCE_PER_EVENT",
+                "monitoringMetadata": {
+                    "type": "MAP"
+                },
+                "consentSettings": {
+                    "consentStatus": "NEEDED",
+                    "consentType": {
+                        "type": "LIST",
+                        "list": [
+                            {
+                                "type": "TEMPLATE",
+                                "value": "ad_storage"
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "tagId": "25",
+                "name": "Google Ads - Conversion Linker",
+                "type": "gclidw",
+                "parameter": [
+                    {
+                        "type": "BOOLEAN",
+                        "key": "enableCrossDomain",
+                        "value": "false"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "enableUrlPassthrough",
+                        "value": "false"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "enableCookieOverrides",
+                        "value": "false"
+                    }
+                ],
+                "fingerprint": "1761460332675",
+                "firingTriggerId": [
+                    "2147479553"
+                ],
+                "parentFolderId": "2",
+                "tagFiringOption": "ONCE_PER_EVENT",
+                "monitoringMetadata": {
+                    "type": "MAP"
+                },
+                "consentSettings": {
+                    "consentStatus": "NOT_SET"
+                }
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "tagId": "26",
+                "name": "Google Ads - purchase",
+                "type": "awct",
+                "parameter": [
+                    {
+                        "type": "BOOLEAN",
+                        "key": "enableNewCustomerReporting",
+                        "value": "false"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "enableConversionLinker",
+                        "value": "true"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "enableProductReporting",
+                        "value": "false"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "conversionValue",
+                        "value": "{{DLV - ecommerce.value}}"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "orderId",
+                        "value": "{{DLV - ecommerce.transaction_id}}"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "enableEnhancedConversion",
+                        "value": "false"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "conversionCookiePrefix",
+                        "value": "_gcl"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "enableShippingData",
+                        "value": "false"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "conversionId",
+                        "value": "{{C - Google Ads conversion ID}}"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "conversionLabel",
+                        "value": "TestLabelPurchase01"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "currencyCode",
+                        "value": "{{DLV - ecommerce.currency}}"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "rdp",
+                        "value": "false"
+                    }
+                ],
+                "fingerprint": "1761546745982",
+                "firingTriggerId": [
+                    "16"
+                ],
+                "blockingTriggerId": [
+                    "18"
+                ],
+                "parentFolderId": "2",
+                "tagFiringOption": "ONCE_PER_EVENT",
+                "monitoringMetadata": {
+                    "type": "MAP"
+                },
+                "consentSettings": {
+                    "consentStatus": "NEEDED",
+                    "consentType": {
+                        "type": "LIST",
+                        "list": [
+                            {
+                                "type": "TEMPLATE",
+                                "value": "ad_storage"
+                            },
+                            {
+                                "type": "TEMPLATE",
+                                "value": "ad_user_data"
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "tagId": "27",
+                "name": "Google Ads - sign_up",
+                "type": "awct",
+                "parameter": [
+                    {
+                        "type": "BOOLEAN",
+                        "key": "enableNewCustomerReporting",
+                        "value": "false"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "enableConversionLinker",
+                        "value": "true"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "enableProductReporting",
+                        "value": "false"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "enableEnhancedConversion",
+                        "value": "false"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "conversionCookiePrefix",
+                        "value": "_gcl"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "enableShippingData",
+                        "value": "false"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "conversionId",
+                        "value": "{{C - Google Ads conversion ID}}"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "conversionLabel",
+                        "value": "TestLabelSignUp01"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "rdp",
+                        "value": "false"
+                    }
+                ],
+                "fingerprint": "1761633159289",
+                "firingTriggerId": [
+                    "17"
+                ],
+                "blockingTriggerId": [
+                    "18"
+                ],
+                "parentFolderId": "2",
+                "tagFiringOption": "ONCE_PER_EVENT",
+                "monitoringMetadata": {
+                    "type": "MAP"
+                },
+                "consentSettings": {
+                    "consentStatus": "NEEDED",
+                    "consentType": {
+                        "type": "LIST",
+                        "list": [
+                            {
+                                "type": "TEMPLATE",
+                                "value": "ad_storage"
+                            },
+                            {
+                                "type": "TEMPLATE",
+                                "value": "ad_user_data"
+                            }
+                        ]
+                    }
+                }
+            }
+        ],
+        "trigger": [
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "triggerId": "15",
+                "name": "CE - cookie_consent_marketing",
+                "type": "CUSTOM_EVENT",
+                "customEventFilter": [
+                    {
+                        "type": "EQUALS",
+                        "parameter": [
+                            {
+                                "type": "TEMPLATE",
+                                "key": "arg0",
+                                "value": "{{_event}}"
+                            },
+                            {
+                                "type": "TEMPLATE",
+                                "key": "arg1",
+                                "value": "cookie_consent_marketing"
+                            }
+                        ]
+                    }
+                ],
+                "fingerprint": "1760596199605"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "triggerId": "16",
+                "name": "CE - purchase",
+                "type": "CUSTOM_EVENT",
+                "customEventFilter": [
+                    {
+                        "type": "EQUALS",
+                        "parameter": [
+                            {
+                                "type": "TEMPLATE",
+                                "key": "arg0",
+                                "value": "{{_event}}"
+                            },
+                            {
+                                "type": "TEMPLATE",
+                                "key": "arg1",
+                                "value": "purchase"
+                            }
+                        ]
+                    }
+                ],
+                "fingerprint": "1760682612912"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "triggerId": "17",
+                "name": "CE - sign_up",
+                "type": "CUSTOM_EVENT",
+                "customEventFilter": [
+                    {
+                        "type": "EQUALS",
+                        "parameter": [
+                            {
+                                "type": "TEMPLATE",
+                                "key": "arg0",
+                                "value": "{{_event}}"
+                            },
+                            {
+                                "type": "TEMPLATE",
+                                "key": "arg1",
+                                "value": "sign_up"
+                            }
+                        ]
+                    }
+                ],
+                "fingerprint": "1760769026219"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "triggerId": "18",
+                "name": "Block - internal traffic",
+                "type": "CUSTOM_EVENT",
+                "customEventFilter": [
+                    {
+                        "type": "MATCH_REGEX",
+                        "parameter": [
+                            {
+                                "type": "TEMPLATE",
+                                "key": "arg0",
+                                "value": "{{_event}}"
+                            },
+                            {
+                                "type": "TEMPLATE",
+                                "key": "arg1",
+                                "value": ".*"
+                            }
+                        ]
+                    }
+                ],
+                "filter": [
+                    {
+                        "type": "EQUALS",
+                        "parameter": [
+                            {
+                                "type": "TEMPLATE",
+                                "key": "arg0",
+                                "value": "{{Cookie - internal_user}}"
+                            },
+                            {
+                                "type": "TEMPLATE",
+                                "key": "arg1",
+                                "value": "true"
+                            }
+                        ]
+                    }
+                ],
+                "notes": "Blocks every ad tag for staff browsers, which carry the internal_user cookie.",
+                "fingerprint": "1760855439526",
+                "parentFolderId": "1"
+            }
+        ],
+        "variable": [
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "variableId": "7",
+                "name": "C - Meta pixel ID",
+                "type": "c",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "value",
+                        "value": "000000000000001"
+                    }
+                ],
+                "fingerprint": "1759904893149",
+                "parentFolderId": "4",
+                "formatValue": {}
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "variableId": "8",
+                "name": "C - Google Ads conversion ID",
+                "type": "c",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "value",
+                        "value": "000000001"
+                    }
+                ],
+                "fingerprint": "1759991306456",
+                "parentFolderId": "2",
+                "formatValue": {}
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "variableId": "9",
+                "name": "C - Microsoft UET tag ID",
+                "type": "c",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "value",
+                        "value": "000000001"
+                    }
+                ],
+                "fingerprint": "1760077719763",
+                "parentFolderId": "5",
+                "formatValue": {}
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "variableId": "10",
+                "name": "C - LinkedIn partner ID",
+                "type": "c",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "value",
+                        "value": "0000001"
+                    }
+                ],
+                "fingerprint": "1760164133070",
+                "parentFolderId": "3",
+                "formatValue": {}
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "variableId": "11",
+                "name": "Cookie - internal_user",
+                "type": "k",
+                "parameter": [
+                    {
+                        "type": "BOOLEAN",
+                        "key": "decodeCookie",
+                        "value": "false"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "name",
+                        "value": "internal_user"
+                    }
+                ],
+                "fingerprint": "1760250546377",
+                "parentFolderId": "1",
+                "formatValue": {}
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "variableId": "12",
+                "name": "DLV - ecommerce.currency",
+                "type": "v",
+                "parameter": [
+                    {
+                        "type": "INTEGER",
+                        "key": "dataLayerVersion",
+                        "value": "2"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "setDefaultValue",
+                        "value": "false"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "name",
+                        "value": "ecommerce.currency"
+                    }
+                ],
+                "fingerprint": "1760336959684",
+                "formatValue": {}
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "variableId": "13",
+                "name": "DLV - ecommerce.transaction_id",
+                "type": "v",
+                "parameter": [
+                    {
+                        "type": "INTEGER",
+                        "key": "dataLayerVersion",
+                        "value": "2"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "setDefaultValue",
+                        "value": "false"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "name",
+                        "value": "ecommerce.transaction_id"
+                    }
+                ],
+                "fingerprint": "1760423372991",
+                "formatValue": {}
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "variableId": "14",
+                "name": "DLV - ecommerce.value",
+                "type": "v",
+                "parameter": [
+                    {
+                        "type": "INTEGER",
+                        "key": "dataLayerVersion",
+                        "value": "2"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "setDefaultValue",
+                        "value": "false"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "name",
+                        "value": "ecommerce.value"
+                    }
+                ],
+                "fingerprint": "1760509786298",
+                "formatValue": {}
+            }
+        ],
+        "folder": [
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "folderId": "1",
+                "name": "Exclusions",
+                "fingerprint": "1759386413307"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "folderId": "2",
+                "name": "Google Ads",
+                "fingerprint": "1759472826614"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "folderId": "3",
+                "name": "LinkedIn",
+                "fingerprint": "1759559239921"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "folderId": "4",
+                "name": "Meta",
+                "fingerprint": "1759645653228"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "folderId": "5",
+                "name": "Microsoft Advertising",
+                "fingerprint": "1759732066535"
+            }
+        ],
+        "builtInVariable": [
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "type": "PAGE_URL",
+                "name": "Page URL"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "type": "PAGE_HOSTNAME",
+                "name": "Page Hostname"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "type": "PAGE_PATH",
+                "name": "Page Path"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "type": "REFERRER",
+                "name": "Referrer"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "type": "EVENT",
+                "name": "Event"
+            }
+        ],
+        "fingerprint": "1761719572596",
+        "tagManagerUrl": "https://tagmanager.google.com/#/versions/accounts/1000/containers/102/versions/0?apiLink=version",
+        "customTemplate": [
+            {
+                "accountId": "1000",
+                "containerId": "102",
+                "templateId": "6",
+                "name": "Meta Pixel",
+                "fingerprint": "1759818479842",
+                "templateData": "___TERMS_OF_SERVICE___\n\nStand-in for the notice the Template Editor writes at the top of every gallery\ntemplate, pointing at Google Tag Manager's Community Template Gallery Developer\nTerms of Service (https://developers.google.com/tag-manager/gallery-tos). Real\ntemplates carry Google's own wording here.\n\n\n___INFO___\n\n{\n  \"type\": \"TAG\",\n  \"id\": \"cvt_T3STP\",\n  \"version\": 1,\n  \"displayName\": \"Meta Pixel\",\n  \"categories\": [\n    \"ADVERTISING\",\n    \"CONVERSIONS\"\n  ],\n  \"brand\": {\n    \"id\": \"github.com_example-pixels\",\n    \"displayName\": \"example-pixels\",\n    \"thumbnail\": \"data:image/png;base64,iVBORw0KGgo=\"\n  },\n  \"description\": \"Loads the Meta Pixel and sends a standard or custom event.\",\n  \"containerContexts\": [\n    \"WEB\"\n  ]\n}\n\n\n___TEMPLATE_PARAMETERS___\n\n[\n  {\n    \"type\": \"TEXT\",\n    \"name\": \"pixelId\",\n    \"displayName\": \"Pixel ID\",\n    \"simpleValueType\": true,\n    \"valueValidators\": [\n      {\n        \"type\": \"NON_EMPTY\"\n      }\n    ]\n  },\n  {\n    \"type\": \"RADIO\",\n    \"name\": \"eventName\",\n    \"displayName\": \"Event\",\n    \"radioItems\": [\n      {\n        \"value\": \"standard\",\n        \"displayValue\": \"Standard\"\n      },\n      {\n        \"value\": \"custom\",\n        \"displayValue\": \"Custom\"\n      }\n    ],\n    \"simpleValueType\": true\n  },\n  {\n    \"type\": \"SELECT\",\n    \"name\": \"standardEventName\",\n    \"displayName\": \"Standard event\",\n    \"selectItems\": [\n      {\n        \"value\": \"PageView\",\n        \"displayValue\": \"PageView\"\n      },\n      {\n        \"value\": \"Purchase\",\n        \"displayValue\": \"Purchase\"\n      },\n      {\n        \"value\": \"CompleteRegistration\",\n        \"displayValue\": \"CompleteRegistration\"\n      },\n      {\n        \"value\": \"Lead\",\n        \"displayValue\": \"Lead\"\n      }\n    ],\n    \"simpleValueType\": true\n  },\n  {\n    \"type\": \"TEXT\",\n    \"name\": \"customEventName\",\n    \"displayName\": \"Custom event\",\n    \"simpleValueType\": true\n  },\n  {\n    \"type\": \"SIMPLE_TABLE\",\n    \"name\": \"objectPropertyList\",\n    \"displayName\": \"Object properties\",\n    \"simpleTableColumns\": [\n      {\n        \"defaultValue\": \"\",\n        \"displayName\": \"Name\",\n        \"name\": \"name\",\n        \"type\": \"TEXT\"\n      },\n      {\n        \"defaultValue\": \"\",\n        \"displayName\": \"Value\",\n        \"name\": \"value\",\n        \"type\": \"TEXT\"\n      }\n    ]\n  },\n  {\n    \"type\": \"CHECKBOX\",\n    \"name\": \"consent\",\n    \"displayName\": \"Honour ad_storage consent\",\n    \"simpleValueType\": true\n  },\n  {\n    \"type\": \"CHECKBOX\",\n    \"name\": \"advancedMatching\",\n    \"displayName\": \"Advanced matching\",\n    \"simpleValueType\": true\n  }\n]\n\n\n___SANDBOXED_JS_FOR_WEB_TEMPLATE___\n\nconst callInWindow = require('callInWindow');\nconst injectScript = require('injectScript');\nconst isConsentGranted = require('isConsentGranted');\nconst logToConsole = require('logToConsole');\nconst makeTableMap = require('makeTableMap');\n\nconst custom = data.eventName === 'custom';\nconst name = custom ? data.customEventName : data.standardEventName;\nconst properties = makeTableMap(data.objectPropertyList || [], 'name', 'value') || {};\n\nconst send = () => {\n  if (data.consent) {\n    callInWindow('fbq', 'consent', isConsentGranted('ad_storage') ? 'grant' : 'revoke');\n  }\n  callInWindow('fbq', 'init', data.pixelId);\n  callInWindow('fbq', custom ? 'trackCustom' : 'track', name, properties);\n  logToConsole('Meta Pixel', name);\n  data.gtmOnSuccess();\n};\n\ninjectScript('https://pixel.example.net/events.js', send, data.gtmOnFailure, 'meta-pixel');\n\n\n___WEB_PERMISSIONS___\n\n[\n  {\n    \"instance\": {\n      \"key\": {\n        \"publicId\": \"access_globals\",\n        \"versionId\": \"1\"\n      },\n      \"param\": [\n        {\n          \"key\": \"keys\",\n          \"value\": {\n            \"type\": 2,\n            \"listItem\": [\n              {\n                \"type\": 3,\n                \"mapKey\": [\n                  {\n                    \"type\": 1,\n                    \"string\": \"key\"\n                  },\n                  {\n                    \"type\": 1,\n                    \"string\": \"read\"\n                  },\n                  {\n                    \"type\": 1,\n                    \"string\": \"write\"\n                  },\n                  {\n                    \"type\": 1,\n                    \"string\": \"execute\"\n                  }\n                ],\n                \"mapValue\": [\n                  {\n                    \"type\": 1,\n                    \"string\": \"fbq\"\n                  },\n                  {\n                    \"type\": 8,\n                    \"boolean\": true\n                  },\n                  {\n                    \"type\": 8,\n                    \"boolean\": true\n                  },\n                  {\n                    \"type\": 8,\n                    \"boolean\": true\n                  }\n                ]\n              },\n              {\n                \"type\": 3,\n                \"mapKey\": [\n                  {\n                    \"type\": 1,\n                    \"string\": \"key\"\n                  },\n                  {\n                    \"type\": 1,\n                    \"string\": \"read\"\n                  },\n                  {\n                    \"type\": 1,\n                    \"string\": \"write\"\n                  },\n                  {\n                    \"type\": 1,\n                    \"string\": \"execute\"\n                  }\n                ],\n                \"mapValue\": [\n                  {\n                    \"type\": 1,\n                    \"string\": \"_fbq\"\n                  },\n                  {\n                    \"type\": 8,\n                    \"boolean\": true\n                  },\n                  {\n                    \"type\": 8,\n                    \"boolean\": true\n                  },\n                  {\n                    \"type\": 8,\n                    \"boolean\": false\n                  }\n                ]\n              }\n            ]\n          }\n        }\n      ]\n    },\n    \"clientAnnotations\": {\n      \"isEditedByUser\": true\n    },\n    \"isRequired\": true\n  },\n  {\n    \"instance\": {\n      \"key\": {\n        \"publicId\": \"access_consent\",\n        \"versionId\": \"1\"\n      },\n      \"param\": [\n        {\n          \"key\": \"consentTypes\",\n          \"value\": {\n            \"type\": 2,\n            \"listItem\": [\n              {\n                \"type\": 3,\n                \"mapKey\": [\n                  {\n                    \"type\": 1,\n                    \"string\": \"consentType\"\n                  },\n                  {\n                    \"type\": 1,\n                    \"string\": \"read\"\n                  },\n                  {\n                    \"type\": 1,\n                    \"string\": \"write\"\n                  }\n                ],\n                \"mapValue\": [\n                  {\n                    \"type\": 1,\n                    \"string\": \"ad_storage\"\n                  },\n                  {\n                    \"type\": 8,\n                    \"boolean\": true\n                  },\n                  {\n                    \"type\": 8,\n                    \"boolean\": false\n                  }\n                ]\n              }\n            ]\n          }\n        }\n      ]\n    },\n    \"clientAnnotations\": {\n      \"isEditedByUser\": true\n    },\n    \"isRequired\": true\n  },\n  {\n    \"instance\": {\n      \"key\": {\n        \"publicId\": \"inject_script\",\n        \"versionId\": \"1\"\n      },\n      \"param\": [\n        {\n          \"key\": \"urls\",\n          \"value\": {\n            \"type\": 2,\n            \"listItem\": [\n              {\n                \"type\": 1,\n                \"string\": \"https://pixel.example.net/events.js\"\n              }\n            ]\n          }\n        }\n      ]\n    },\n    \"clientAnnotations\": {\n      \"isEditedByUser\": true\n    },\n    \"isRequired\": true\n  },\n  {\n    \"instance\": {\n      \"key\": {\n        \"publicId\": \"logging\",\n        \"versionId\": \"1\"\n      },\n      \"param\": [\n        {\n          \"key\": \"environments\",\n          \"value\": {\n            \"type\": 1,\n            \"string\": \"debug\"\n          }\n        }\n      ]\n    },\n    \"isRequired\": true\n  }\n]\n\n\n___TESTS___\n\nscenarios: []\n\n\n___NOTES___\n\nCreated on 21/11/2025, 08:03:19\n\n\n",
+                "galleryReference": {
+                    "host": "github.com",
+                    "owner": "example-pixels",
+                    "repository": "meta-pixel-template",
+                    "version": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+                    "signature": "1d2c3b4a59687766554433221100ffeeddccbbaa99887766554433221100ffee",
+                    "galleryTemplateId": "T3STP"
+                }
+            }
+        ]
+    }
+}

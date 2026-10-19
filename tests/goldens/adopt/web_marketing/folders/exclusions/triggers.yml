@@ -1,0 +1,16 @@
+tiggy: 1
+triggers:
+  - name: Block - internal traffic
+    type: CUSTOM_EVENT
+    folder: Exclusions
+    custom_event_filter:
+      - type: MATCH_REGEX
+        parameter:
+          arg0: '{{_event}}'
+          arg1: .*
+    filter:
+      - type: EQUALS
+        parameter:
+          arg0: '{{Cookie - internal_user}}'
+          arg1: 'true'
+    notes: 'Blocks every ad tag for staff browsers, which carry the internal_user cookie.'

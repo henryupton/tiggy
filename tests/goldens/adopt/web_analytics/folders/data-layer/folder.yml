@@ -1,0 +1,4 @@
+tiggy: 1
+folders:
+  - name: Data Layer
+    notes: 'One variable per event attribute: version 2, no default.'

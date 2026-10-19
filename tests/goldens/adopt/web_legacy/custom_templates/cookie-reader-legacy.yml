@@ -1,0 +1,4 @@
+tiggy: 1
+custom_templates:
+  - name: Cookie Reader (legacy)
+    template_data: {$file: custom_templates/cookie-reader-legacy.tpl}

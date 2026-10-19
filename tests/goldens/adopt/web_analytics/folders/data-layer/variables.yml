@@ -1,0 +1,212 @@
+tiggy: 1
+variables:
+  - name: DLV - event_attributes.build_number
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.build_number
+  - name: DLV - event_attributes.download_format
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.download_format
+  - name: DLV - event_attributes.element_text
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.element_text
+  - name: DLV - event_attributes.environment
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.environment
+  - name: DLV - event_attributes.item_brand
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.item_brand
+  - name: DLV - event_attributes.item_category
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.item_category
+  - name: DLV - event_attributes.item_category2
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.item_category2
+  - name: DLV - event_attributes.item_id
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.item_id
+  - name: DLV - event_attributes.item_name
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.item_name
+  - name: DLV - event_attributes.item_variant
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.item_variant
+  - name: DLV - event_attributes.license_type
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.license_type
+  - name: DLV - event_attributes.link_url
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.link_url
+  - name: DLV - event_attributes.list_name
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.list_name
+  - name: DLV - event_attributes.method
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.method
+  - name: DLV - event_attributes.page_section
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.page_section
+  - name: DLV - event_attributes.page_template
+    type: v
+    folder: Data Layer
+    format_value:
+      convert_undefined_to_value: (not set)
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.page_template
+  - name: DLV - event_attributes.plan_name
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.plan_name
+  - name: DLV - event_attributes.platform
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.platform
+  - name: DLV - event_attributes.search_filters
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.search_filters
+  - name: DLV - event_attributes.search_results_count
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.search_results_count
+  - name: DLV - event_attributes.search_term
+    type: v
+    folder: Data Layer
+    format_value:
+      case_conversion_type: LOWERCASE
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.search_term
+  - name: DLV - event_attributes.site_language
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.site_language
+  - name: DLV - event_attributes.sort_order
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.sort_order
+  - name: DLV - event_attributes.user_logged_in
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.user_logged_in
+  - name: DLV - event_attributes.wishlist_id
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.wishlist_id
+  - name: DLV - event_name
+    type: v
+    folder: Data Layer
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_name

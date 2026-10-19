@@ -1,0 +1,9 @@
+tiggy: 1
+variables:
+  - name: URL - gclid
+    type: u
+    folder: Archive
+    format_value: {}
+    parameter:
+      component: QUERY
+      queryKey: gclid

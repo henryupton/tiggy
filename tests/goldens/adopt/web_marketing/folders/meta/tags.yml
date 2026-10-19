@@ -1,0 +1,67 @@
+tiggy: 1
+tags:
+  - name: Meta - Pixel - Base
+    type: {template: Meta Pixel}
+    folder: Meta
+    firing_triggers:
+      - CE - cookie_consent_marketing
+    blocking_triggers:
+      - Block - internal traffic
+    tag_firing_option: ONCE_PER_LOAD
+    consent_settings:
+      consent_status: NEEDED
+      consent_type:
+        - ad_storage
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      pixelId: '{{C - Meta pixel ID}}'
+      eventName: standard
+      standardEventName: PageView
+      consent: true
+      advancedMatching: false
+  - name: Meta - Pixel - CompleteRegistration
+    type: {template: Meta Pixel}
+    folder: Meta
+    firing_triggers:
+      - CE - sign_up
+    blocking_triggers:
+      - Block - internal traffic
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NEEDED
+      consent_type:
+        - ad_storage
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      pixelId: '{{C - Meta pixel ID}}'
+      eventName: standard
+      standardEventName: CompleteRegistration
+      consent: true
+      advancedMatching: false
+  - name: Meta - Pixel - Purchase
+    type: {template: Meta Pixel}
+    folder: Meta
+    firing_triggers:
+      - CE - purchase
+    blocking_triggers:
+      - Block - internal traffic
+    setup_tag:
+      - tag_name: Meta - Pixel - Base
+        stop_on_setup_failure: true
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NEEDED
+      consent_type:
+        - ad_storage
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      pixelId: '{{C - Meta pixel ID}}'
+      eventName: standard
+      standardEventName: Purchase
+      objectPropertyList:
+        - name: value
+          value: '{{DLV - ecommerce.value}}'
+        - name: currency
+          value: '{{DLV - ecommerce.currency}}'
+      consent: true
+      advancedMatching: false

@@ -1,0 +1,34 @@
+tiggy: 1
+tags:
+  - name: Microsoft Ads - UET base
+    type: html
+    folder: Microsoft Advertising
+    firing_triggers:
+      - CE - cookie_consent_marketing
+    blocking_triggers:
+      - Block - internal traffic
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NEEDED
+      consent_type:
+        - ad_storage
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      html: {$file: folders/microsoft-advertising/microsoft-ads-uet-base.html}
+      supportDocumentWrite: false
+  - name: Microsoft Ads - UET purchase
+    type: html
+    folder: Microsoft Advertising
+    firing_triggers:
+      - CE - purchase
+    blocking_triggers:
+      - Block - internal traffic
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NEEDED
+      consent_type:
+        - ad_storage
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      html: {$file: folders/microsoft-advertising/microsoft-ads-uet-purchase.html}
+      supportDocumentWrite: false

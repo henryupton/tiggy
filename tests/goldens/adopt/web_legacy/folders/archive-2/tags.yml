@@ -1,0 +1,12 @@
+tiggy: 1
+tags:
+  - name: HTML - Survey (no trigger)
+    type: html
+    folder: archive
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      html: {$file: folders/archive-2/html-survey-no-trigger.html}
+      supportDocumentWrite: false

@@ -1,0 +1,23 @@
+tiggy: 1
+variables:
+  - name: DLV - ecommerce.currency
+    type: v
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: ecommerce.currency
+  - name: DLV - ecommerce.transaction_id
+    type: v
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: ecommerce.transaction_id
+  - name: DLV - ecommerce.value
+    type: v
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: ecommerce.value

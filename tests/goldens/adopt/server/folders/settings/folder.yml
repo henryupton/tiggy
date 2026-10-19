@@ -1,0 +1,4 @@
+tiggy: 1
+folders:
+  - name: Settings
+    notes: Constants the tags read. Placeholders only; live values are set in GTM.

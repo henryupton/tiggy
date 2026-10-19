@@ -1,0 +1,66 @@
+tiggy: 1
+tags:
+  - name: Google Ads - Conversion Linker
+    type: gclidw
+    folder: Google Ads
+    firing_triggers:
+      - {built_in: All Pages}
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      enableCrossDomain: false
+      enableUrlPassthrough: false
+      enableCookieOverrides: false
+  - name: Google Ads - purchase
+    type: awct
+    folder: Google Ads
+    firing_triggers:
+      - CE - purchase
+    blocking_triggers:
+      - Block - internal traffic
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NEEDED
+      consent_type:
+        - ad_storage
+        - ad_user_data
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      enableNewCustomerReporting: false
+      enableConversionLinker: true
+      enableProductReporting: false
+      conversionValue: '{{DLV - ecommerce.value}}'
+      orderId: '{{DLV - ecommerce.transaction_id}}'
+      enableEnhancedConversion: false
+      conversionCookiePrefix: _gcl
+      enableShippingData: false
+      conversionId: '{{C - Google Ads conversion ID}}'
+      conversionLabel: TestLabelPurchase01
+      currencyCode: '{{DLV - ecommerce.currency}}'
+      rdp: false
+  - name: Google Ads - sign_up
+    type: awct
+    folder: Google Ads
+    firing_triggers:
+      - CE - sign_up
+    blocking_triggers:
+      - Block - internal traffic
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NEEDED
+      consent_type:
+        - ad_storage
+        - ad_user_data
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      enableNewCustomerReporting: false
+      enableConversionLinker: true
+      enableProductReporting: false
+      enableEnhancedConversion: false
+      conversionCookiePrefix: _gcl
+      enableShippingData: false
+      conversionId: '{{C - Google Ads conversion ID}}'
+      conversionLabel: TestLabelSignUp01
+      rdp: false

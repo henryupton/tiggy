@@ -1,0 +1,887 @@
+{
+    "exportFormatVersion": 2,
+    "exportTime": "2026-10-19 09:30:00",
+    "containerVersion": {
+        "path": "accounts/1000/containers/104/versions/412",
+        "accountId": "1000",
+        "containerId": "104",
+        "containerVersionId": "412",
+        "container": {
+            "path": "accounts/1000/containers/104",
+            "accountId": "1000",
+            "containerId": "104",
+            "name": "Example - Legacy",
+            "publicId": "GTM-TEST004",
+            "usageContext": [
+                "WEB"
+            ],
+            "notes": "Inherited from the previous agency. Nobody is sure what half of it does.",
+            "fingerprint": "1496000000000",
+            "tagManagerUrl": "https://tagmanager.google.com/#/container/accounts/1000/containers/104/workspaces?apiLink=container",
+            "features": {
+                "supportUserPermissions": true,
+                "supportEnvironments": true,
+                "supportWorkspaces": true,
+                "supportGtagConfigs": false,
+                "supportBuiltInVariables": true,
+                "supportClients": false,
+                "supportFolders": true,
+                "supportTags": true,
+                "supportTemplates": true,
+                "supportTriggers": true,
+                "supportVariables": true,
+                "supportVersions": true,
+                "supportZones": true,
+                "supportTransformations": false
+            },
+            "tagIds": [
+                "GTM-TEST004"
+            ]
+        },
+        "tag": [
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "tagId": "20",
+                "name": "UA - Pageview",
+                "type": "ua",
+                "parameter": [
+                    {
+                        "type": "BOOLEAN",
+                        "key": "enableEcommerce",
+                        "value": "false"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "setTrackerName",
+                        "value": "false"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "doubleClick",
+                        "value": "false"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "useDebugVersion",
+                        "value": "false"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "trackingId",
+                        "value": "{{C - UA property ID}}"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "trackType",
+                        "value": "TRACK_PAGEVIEW"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "enableLinkId",
+                        "value": "false"
+                    }
+                ],
+                "notes": "Paused when Universal Analytics stopped processing; kept for reference.",
+                "fingerprint": "1497728266140",
+                "firingTriggerId": [
+                    "2147479553"
+                ],
+                "parentFolderId": "3",
+                "paused": true,
+                "tagFiringOption": "ONCE_PER_EVENT",
+                "monitoringMetadata": {
+                    "type": "MAP"
+                },
+                "consentSettings": {
+                    "consentStatus": "NOT_SET"
+                }
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "tagId": "21",
+                "name": "UA - Event - Sign_up",
+                "type": "ua",
+                "parameter": [
+                    {
+                        "type": "BOOLEAN",
+                        "key": "enableEcommerce",
+                        "value": "false"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "setTrackerName",
+                        "value": "false"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "doubleClick",
+                        "value": "false"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "useDebugVersion",
+                        "value": "false"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "trackingId",
+                        "value": "{{C - UA property ID}}"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "trackType",
+                        "value": "TRACK_EVENT"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "enableLinkId",
+                        "value": "false"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "eventCategory",
+                        "value": "Account"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "eventAction",
+                        "value": "Sign up"
+                    }
+                ],
+                "fingerprint": "1497814679447",
+                "firingTriggerId": [
+                    "15"
+                ],
+                "parentFolderId": "3",
+                "paused": true,
+                "tagFiringOption": "ONCE_PER_EVENT",
+                "monitoringMetadata": {
+                    "type": "MAP"
+                },
+                "consentSettings": {
+                    "consentStatus": "NOT_SET"
+                }
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "tagId": "22",
+                "name": "HTML - analytics.js (UA, old)",
+                "type": "html",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "html",
+                        "value": "<script>\n(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){\n(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),\nm=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)\n})(window,document,'script','//www.google-analytics.com/analytics.js','ga');\nga('create', '{{C - UA property ID}}', 'auto');\nga('send', 'pageview');\n</script>"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "supportDocumentWrite",
+                        "value": "false"
+                    }
+                ],
+                "fingerprint": "1497901092754",
+                "firingTriggerId": [
+                    "2147479553"
+                ],
+                "parentFolderId": "3",
+                "paused": true,
+                "tagFiringOption": "ONCE_PER_EVENT",
+                "monitoringMetadata": {
+                    "type": "MAP"
+                },
+                "consentSettings": {
+                    "consentStatus": "NOT_SET"
+                }
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "tagId": "23",
+                "name": "Google tag - G-TEST000004",
+                "type": "googtag",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "tagId",
+                        "value": "G-TEST000004"
+                    }
+                ],
+                "fingerprint": "1497987506061",
+                "firingTriggerId": [
+                    "2147479553"
+                ],
+                "tagFiringOption": "ONCE_PER_EVENT",
+                "monitoringMetadata": {
+                    "type": "MAP"
+                },
+                "consentSettings": {
+                    "consentStatus": "NOT_SET"
+                }
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "tagId": "24",
+                "name": "HTML - gtag.js (before the Google tag)",
+                "type": "html",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "html",
+                        "value": "<!-- Hard-coded before the Google tag existed; paused, not removed. -->\n<script async src=\"https://www.googletagmanager.com/gtag/js?id=G-TEST000004\"></script>\n<script>\n  window.dataLayer = window.dataLayer || [];\n  function gtag(){dataLayer.push(arguments);}\n  gtag('js', new Date());\n  gtag('config', 'G-TEST000004');\n</script>\n"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "supportDocumentWrite",
+                        "value": "false"
+                    }
+                ],
+                "fingerprint": "1498073919368",
+                "firingTriggerId": [
+                    "2147479553"
+                ],
+                "parentFolderId": "1",
+                "paused": true,
+                "tagFiringOption": "ONCE_PER_EVENT",
+                "monitoringMetadata": {
+                    "type": "MAP"
+                },
+                "consentSettings": {
+                    "consentStatus": "NOT_SET"
+                }
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "tagId": "25",
+                "name": "GA4 - sign_up",
+                "type": "gaawe",
+                "parameter": [
+                    {
+                        "type": "BOOLEAN",
+                        "key": "sendEcommerceData",
+                        "value": "false"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "enhancedUserId",
+                        "value": "false"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "eventName",
+                        "value": "sign_up"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "measurementIdOverride",
+                        "value": "G-TEST000004"
+                    }
+                ],
+                "fingerprint": "1498160332675",
+                "firingTriggerId": [
+                    "16"
+                ],
+                "tagFiringOption": "ONCE_PER_EVENT",
+                "monitoringMetadata": {
+                    "type": "MAP"
+                },
+                "consentSettings": {
+                    "consentStatus": "NOT_SET"
+                }
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "tagId": "26",
+                "name": "HTML - Click tracking (old)",
+                "type": "html",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "html",
+                        "value": "<script>\n  window.dataLayer.push({event: 'old_click', click_text: '{{Click Text}}', page_path: '{{Page Path}}'});\n</script>\n"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "supportDocumentWrite",
+                        "value": "false"
+                    }
+                ],
+                "fingerprint": "1498246745982",
+                "firingTriggerId": [
+                    "19"
+                ],
+                "parentFolderId": "1",
+                "tagFiringOption": "ONCE_PER_EVENT",
+                "monitoringMetadata": {
+                    "type": "MAP"
+                },
+                "consentSettings": {
+                    "consentStatus": "NOT_SET"
+                }
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "tagId": "27",
+                "name": "HTML - Session recording snippet pasted from the vendor's onboarding email; ask the web team before editing, and keep it for the yearly audit - copy A",
+                "type": "html",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "html",
+                        "value": "<script>\n  (function (d) {\n    var s = d.createElement('script');\n    s.async = true;\n    s.src = '//static.example.org/recorder/v1/recorder.js';\n    d.head.appendChild(s);\n  })(document);\n</script>\n"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "supportDocumentWrite",
+                        "value": "false"
+                    }
+                ],
+                "fingerprint": "1498333159289",
+                "firingTriggerId": [
+                    "2147479553"
+                ],
+                "paused": true,
+                "tagFiringOption": "ONCE_PER_EVENT",
+                "monitoringMetadata": {
+                    "type": "MAP"
+                },
+                "consentSettings": {
+                    "consentStatus": "NOT_SET"
+                }
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "tagId": "28",
+                "name": "HTML - Session recording snippet pasted from the vendor's onboarding email; ask the web team before editing, and keep it for the yearly audit - copy B",
+                "type": "html",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "html",
+                        "value": "<script>\n  (function (d) {\n    var s = d.createElement('script');\n    s.async = true;\n    s.src = '//static.example.org/recorder/v1/recorder.js';\n    d.head.appendChild(s);\n  })(document);\n</script>\n"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "supportDocumentWrite",
+                        "value": "false"
+                    }
+                ],
+                "fingerprint": "1498419572596",
+                "firingTriggerId": [
+                    "2147479553"
+                ],
+                "tagFiringOption": "ONCE_PER_EVENT",
+                "monitoringMetadata": {
+                    "type": "MAP"
+                },
+                "consentSettings": {
+                    "consentStatus": "NOT_SET"
+                }
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "tagId": "29",
+                "name": "HTML - Chat widget / support bubble",
+                "type": "html",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "html",
+                        "value": "<script src=\"https://chat.example.net/widget.js\" data-team=\"support\" async></script>\n"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "supportDocumentWrite",
+                        "value": "false"
+                    }
+                ],
+                "notes": "The chat contract ended; the widget still loads.",
+                "fingerprint": "1498505985903",
+                "firingTriggerId": [
+                    "2147479553"
+                ],
+                "tagFiringOption": "ONCE_PER_EVENT",
+                "monitoringMetadata": {
+                    "type": "MAP"
+                },
+                "consentSettings": {
+                    "consentStatus": "NOT_SET"
+                }
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "tagId": "30",
+                "name": "HTML - Survey (no trigger)",
+                "type": "html",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "html",
+                        "value": "<div id=\"survey\"></div>\n<script src=\"https://survey.example.net/embed.js\" async></script>"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "supportDocumentWrite",
+                        "value": "false"
+                    }
+                ],
+                "fingerprint": "1498592399210",
+                "parentFolderId": "2",
+                "tagFiringOption": "ONCE_PER_EVENT",
+                "monitoringMetadata": {
+                    "type": "MAP"
+                },
+                "consentSettings": {
+                    "consentStatus": "NOT_SET"
+                }
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "tagId": "31",
+                "name": "タグ - 日本語ブログ",
+                "type": "html",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "html",
+                        "value": "<script>\n  window.dataLayer.push({event: 'blog_view', blog_language: 'ja'});\n</script>\n"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "supportDocumentWrite",
+                        "value": "false"
+                    }
+                ],
+                "fingerprint": "1498678812517",
+                "firingTriggerId": [
+                    "18"
+                ],
+                "parentFolderId": "4",
+                "tagFiringOption": "ONCE_PER_EVENT",
+                "monitoringMetadata": {
+                    "type": "MAP"
+                },
+                "consentSettings": {
+                    "consentStatus": "NOT_SET"
+                }
+            }
+        ],
+        "trigger": [
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "triggerId": "15",
+                "name": "CE - Sign_up",
+                "type": "CUSTOM_EVENT",
+                "customEventFilter": [
+                    {
+                        "type": "EQUALS",
+                        "parameter": [
+                            {
+                                "type": "TEMPLATE",
+                                "key": "arg0",
+                                "value": "{{_event}}"
+                            },
+                            {
+                                "type": "TEMPLATE",
+                                "key": "arg1",
+                                "value": "Sign_up"
+                            }
+                        ]
+                    }
+                ],
+                "notes": "The old site pushed Sign_up, capitalised.",
+                "fingerprint": "1497296199605"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "triggerId": "16",
+                "name": "CE - sign_up",
+                "type": "CUSTOM_EVENT",
+                "customEventFilter": [
+                    {
+                        "type": "EQUALS",
+                        "parameter": [
+                            {
+                                "type": "TEMPLATE",
+                                "key": "arg0",
+                                "value": "{{_event}}"
+                            },
+                            {
+                                "type": "TEMPLATE",
+                                "key": "arg1",
+                                "value": "sign_up"
+                            }
+                        ]
+                    }
+                ],
+                "fingerprint": "1497382612912"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "triggerId": "17",
+                "name": "CE - checkout_step (old)",
+                "type": "CUSTOM_EVENT",
+                "customEventFilter": [
+                    {
+                        "type": "EQUALS",
+                        "parameter": [
+                            {
+                                "type": "TEMPLATE",
+                                "key": "arg0",
+                                "value": "{{_event}}"
+                            },
+                            {
+                                "type": "TEMPLATE",
+                                "key": "arg1",
+                                "value": "checkout_step"
+                            }
+                        ]
+                    }
+                ],
+                "notes": "Fired the old checkout funnel tags, all deleted since.",
+                "fingerprint": "1497469026219",
+                "parentFolderId": "1"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "triggerId": "18",
+                "name": "PV - /blog/ pages",
+                "type": "PAGEVIEW",
+                "filter": [
+                    {
+                        "type": "STARTS_WITH",
+                        "parameter": [
+                            {
+                                "type": "TEMPLATE",
+                                "key": "arg0",
+                                "value": "{{Page Path}}"
+                            },
+                            {
+                                "type": "TEMPLATE",
+                                "key": "arg1",
+                                "value": "/blog/"
+                            }
+                        ]
+                    }
+                ],
+                "fingerprint": "1497555439526"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "triggerId": "19",
+                "name": "Click - All Elements",
+                "type": "CLICK",
+                "fingerprint": "1497641852833"
+            }
+        ],
+        "variable": [
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "variableId": "7",
+                "name": "C - UA property ID",
+                "type": "c",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "value",
+                        "value": "UA-000000-1"
+                    }
+                ],
+                "fingerprint": "1496604893149",
+                "parentFolderId": "3",
+                "formatValue": {}
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "variableId": "8",
+                "name": "DLV - pageCategory",
+                "type": "v",
+                "parameter": [
+                    {
+                        "type": "INTEGER",
+                        "key": "dataLayerVersion",
+                        "value": "1"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "setDefaultValue",
+                        "value": "false"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "name",
+                        "value": "pageCategory"
+                    }
+                ],
+                "notes": "Pushed by the old CMS templates; the current site never sets it.",
+                "fingerprint": "1496691306456",
+                "formatValue": {}
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "variableId": "9",
+                "name": "DLV - userType",
+                "type": "v",
+                "parameter": [
+                    {
+                        "type": "INTEGER",
+                        "key": "dataLayerVersion",
+                        "value": "1"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "setDefaultValue",
+                        "value": "false"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "name",
+                        "value": "userType"
+                    }
+                ],
+                "fingerprint": "1496777719763",
+                "formatValue": {}
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "variableId": "10",
+                "name": "DLV - ecommerce.items",
+                "type": "v",
+                "parameter": [
+                    {
+                        "type": "INTEGER",
+                        "key": "dataLayerVersion",
+                        "value": "2"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "setDefaultValue",
+                        "value": "false"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "name",
+                        "value": "ecommerce.items"
+                    }
+                ],
+                "fingerprint": "1496864133070",
+                "formatValue": {}
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "variableId": "11",
+                "name": "DLV - event_attributes.legacy_id",
+                "type": "v",
+                "parameter": [
+                    {
+                        "type": "INTEGER",
+                        "key": "dataLayerVersion",
+                        "value": "2"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "setDefaultValue",
+                        "value": "false"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "name",
+                        "value": "event_attributes.legacy_id"
+                    }
+                ],
+                "fingerprint": "1496950546377",
+                "formatValue": {}
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "variableId": "12",
+                "name": "Catégorie de page",
+                "type": "v",
+                "parameter": [
+                    {
+                        "type": "INTEGER",
+                        "key": "dataLayerVersion",
+                        "value": "2"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "setDefaultValue",
+                        "value": "false"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "name",
+                        "value": "page.category"
+                    }
+                ],
+                "fingerprint": "1497036959684",
+                "parentFolderId": "4",
+                "formatValue": {}
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "variableId": "13",
+                "name": "URL - gclid",
+                "type": "u",
+                "parameter": [
+                    {
+                        "type": "TEMPLATE",
+                        "key": "component",
+                        "value": "QUERY"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "queryKey",
+                        "value": "gclid"
+                    }
+                ],
+                "fingerprint": "1497123372991",
+                "parentFolderId": "1",
+                "formatValue": {}
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "variableId": "14",
+                "name": "DLV - promoCode (old)",
+                "type": "v",
+                "parameter": [
+                    {
+                        "type": "INTEGER",
+                        "key": "dataLayerVersion",
+                        "value": "2"
+                    },
+                    {
+                        "type": "BOOLEAN",
+                        "key": "setDefaultValue",
+                        "value": "true"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "defaultValue",
+                        "value": "none"
+                    },
+                    {
+                        "type": "TEMPLATE",
+                        "key": "name",
+                        "value": "promoCode"
+                    }
+                ],
+                "fingerprint": "1497209786298",
+                "parentFolderId": "2",
+                "formatValue": {}
+            }
+        ],
+        "folder": [
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "folderId": "1",
+                "name": "Archive",
+                "notes": "Old tags kept in case someone asks. Nobody has.",
+                "fingerprint": "1496086413307"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "folderId": "2",
+                "name": "archive",
+                "fingerprint": "1496172826614"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "folderId": "3",
+                "name": "UA / GA3 (deprecated)",
+                "fingerprint": "1496259239921"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "folderId": "4",
+                "name": "Données personnelles",
+                "fingerprint": "1496345653228"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "folderId": "5",
+                "name": "Q3 cleanup",
+                "notes": "Move things here before deleting them.",
+                "fingerprint": "1496432066535"
+            }
+        ],
+        "builtInVariable": [
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "type": "PAGE_URL",
+                "name": "Page URL"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "type": "PAGE_HOSTNAME",
+                "name": "Page Hostname"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "type": "PAGE_PATH",
+                "name": "Page Path"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "type": "REFERRER",
+                "name": "Referrer"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "type": "EVENT",
+                "name": "Event"
+            },
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "type": "DEBUG_MODE",
+                "name": "Debug Mode"
+            }
+        ],
+        "fingerprint": "1498765225824",
+        "tagManagerUrl": "https://tagmanager.google.com/#/versions/accounts/1000/containers/104/versions/412?apiLink=version",
+        "customTemplate": [
+            {
+                "accountId": "1000",
+                "containerId": "104",
+                "templateId": "6",
+                "name": "Cookie Reader (legacy)",
+                "fingerprint": "1496518479842",
+                "templateData": "___INFO___\n\n{\n  \"type\": \"MACRO\",\n  \"id\": \"cvt_temp_public_id\",\n  \"version\": 1,\n  \"securityGroups\": [],\n  \"displayName\": \"Cookie Reader (legacy)\",\n  \"brand\": {\n    \"id\": \"brand_dummy\",\n    \"displayName\": \"\"\n  },\n  \"description\": \"\",\n  \"containerContexts\": [\n    \"WEB\"\n  ]\n}\n\n\n___TEMPLATE_PARAMETERS___\n\n[\n  {\n    \"type\": \"TEXT\",\n    \"name\": \"cookieName\",\n    \"displayName\": \"Cookie name\",\n    \"simpleValueType\": true,\n    \"valueValidators\": [\n      {\n        \"type\": \"NON_EMPTY\"\n      }\n    ]\n  }\n]\n\n\n___SANDBOXED_JS_FOR_WEB_TEMPLATE___\n\nconst getCookieValues = require('getCookieValues');\n\nreturn getCookieValues(data.cookieName)[0];\n\n\n___WEB_PERMISSIONS___\n\n[\n  {\n    \"instance\": {\n      \"key\": {\n        \"publicId\": \"get_cookies\",\n        \"versionId\": \"1\"\n      },\n      \"param\": [\n        {\n          \"key\": \"cookieAccess\",\n          \"value\": {\n            \"type\": 1,\n            \"string\": \"any\"\n          }\n        }\n      ]\n    },\n    \"clientAnnotations\": {\n      \"isEditedByUser\": true\n    },\n    \"isRequired\": true\n  }\n]\n\n\n___TESTS___\n\nscenarios: []\n\n\n___NOTES___\n\nCreated on 07/06/2018, 15:02:11\n\n\n"
+            }
+        ]
+    }
+}

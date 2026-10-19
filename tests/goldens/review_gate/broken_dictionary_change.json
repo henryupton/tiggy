@@ -1,0 +1,47 @@
+{
+  "container": {
+    "name": "Example - Analytics",
+    "publicId": null,
+    "version": "0"
+  },
+  "counts": {
+    "tag": 11,
+    "trigger": 6,
+    "variable": 30,
+    "template": 2
+  },
+  "summary": {
+    "errors": 3,
+    "warnings": 0
+  },
+  "files": [],
+  "findings": [
+    {
+      "rule": "unknown-variable",
+      "severity": "error",
+      "kind": "tag",
+      "name": "GA4 - file_download",
+      "id": "5",
+      "message": "eventSettingsTable[3].parameterValue: {{DLV - event_attributes.licence_type}} is not a variable or an enabled built-in (did you mean \"DLV - event_attributes.license_type\"?)",
+      "location": "folders/ga4/tags.yml:3"
+    },
+    {
+      "rule": "built-in-not-enabled",
+      "severity": "error",
+      "kind": "tag",
+      "name": "GA4 - track_event",
+      "id": "8",
+      "message": "eventSettingsTable[8].parameterValue: {{Click URL}} is a built-in variable that isn't enabled",
+      "location": "folders/ga4/tags.yml:64"
+    },
+    {
+      "rule": "unknown-variable",
+      "severity": "error",
+      "kind": "variable",
+      "name": "CJS - first-party payload",
+      "id": "27",
+      "message": "javascript: {{DLV - event_attributes.coupon_code}} is not a variable or an enabled built-in (did you mean \"DLV - event_attributes.sort_order\"?)",
+      "location": "folders/first-party/variables.yml:3"
+    }
+  ]
+}

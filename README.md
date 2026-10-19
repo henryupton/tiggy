@@ -142,3 +142,27 @@ changes:
 ```bash
 uv run python scripts/generate_resources.py --refresh
 ```
+
+## Tests
+
+```bash
+uv sync
+uv run pytest                  # everything, about three minutes
+uv run pytest -m "not slow"    # the quick loop
+```
+
+The scenarios follow how a team adopts Tiggy: codify a live container as-is, change it through pull requests, catch
+mistakes in review, notice hotfixes made in the GTM UI, and survive the adopting repo's pre-commit hooks. They run
+against synthetic containers in `tests/fixtures/` (see its README) and four redistributable public exports. Known gaps
+are written as the behaviour they should have and marked `xfail(strict=True)`, so fixing one turns its test red until
+the marker comes off.
+
+To run the same round trips against real containers without committing them, point `TIGGY_EXTRA_EXPORTS` at a
+directory of exports kept outside the repo:
+
+```bash
+TIGGY_EXTRA_EXPORTS=~/gtm-exports uv run pytest
+```
+
+Spec trees and reports are compared with goldens in `tests/goldens/`. After an intended change to layout or output,
+regenerate them with `uv run pytest --update-goldens` and review the diff.

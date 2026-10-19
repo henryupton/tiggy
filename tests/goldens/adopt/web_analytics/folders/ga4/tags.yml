@@ -1,0 +1,170 @@
+tiggy: 1
+tags:
+  - name: GA4 - file_download
+    type: gaawe
+    folder: GA4
+    firing_triggers:
+      - CE - track_event - file_download
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      sendEcommerceData: false
+      enhancedUserId: false
+      eventSettingsTable:
+        - parameter: content_id
+          parameterValue: '{{DLV - event_attributes.item_id}}'
+        - parameter: download_format
+          parameterValue: '{{DLV - event_attributes.download_format}}'
+        - parameter: item_variant
+          parameterValue: '{{DLV - event_attributes.item_variant}}'
+        - parameter: license_type
+          parameterValue: '{{DLV - event_attributes.license_type}}'
+      eventName: file_download
+      measurementIdOverride: '{{C - GA4 measurement ID}}'
+  - name: GA4 - page_view
+    type: gaawe
+    folder: GA4
+    firing_triggers:
+      - PV - production hosts
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      sendEcommerceData: false
+      enhancedUserId: false
+      eventSettingsTable:
+        - parameter: page_location
+          parameterValue: '{{Page URL}}'
+        - parameter: page_referrer
+          parameterValue: '{{Referrer}}'
+      eventName: page_view
+      measurementIdOverride: '{{C - GA4 measurement ID}}'
+  - name: GA4 - sign_up
+    type: gaawe
+    folder: GA4
+    firing_triggers:
+      - CE - sign_up
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      sendEcommerceData: false
+      enhancedUserId: false
+      eventSettingsTable:
+        - parameter: method
+          parameterValue: '{{DLV - event_attributes.method}}'
+        - parameter: plan_name
+          parameterValue: '{{DLV - event_attributes.plan_name}}'
+      eventName: sign_up
+      measurementIdOverride: '{{C - GA4 measurement ID}}'
+  - name: GA4 - track_event
+    type: gaawe
+    folder: GA4
+    firing_triggers:
+      - CE - track_event
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      sendEcommerceData: false
+      enhancedUserId: false
+      eventSettingsTable:
+        - parameter: build_number
+          parameterValue: '{{DLV - event_attributes.build_number}}'
+        - parameter: content_id
+          parameterValue: '{{DLV - event_attributes.item_id}}'
+        - parameter: environment
+          parameterValue: '{{DLV - event_attributes.environment}}'
+        - parameter: item_brand
+          parameterValue: '{{DLV - event_attributes.item_brand}}'
+        - parameter: item_category
+          parameterValue: '{{DLV - event_attributes.item_category}}'
+        - parameter: item_category2
+          parameterValue: '{{DLV - event_attributes.item_category2}}'
+        - parameter: item_name
+          parameterValue: '{{DLV - event_attributes.item_name}}'
+        - parameter: item_variant
+          parameterValue: '{{DLV - event_attributes.item_variant}}'
+        - parameter: link_url
+          parameterValue: '{{DLV - event_attributes.link_url}}'
+        - parameter: list_name
+          parameterValue: '{{DLV - event_attributes.list_name}}'
+        - parameter: page_section
+          parameterValue: '{{DLV - event_attributes.page_section}}'
+        - parameter: page_template
+          parameterValue: '{{DLV - event_attributes.page_template}}'
+        - parameter: platform
+          parameterValue: '{{DLV - event_attributes.platform}}'
+        - parameter: site_language
+          parameterValue: '{{DLV - event_attributes.site_language}}'
+      userProperties:
+        - name: user_logged_in
+          value: '{{DLV - event_attributes.user_logged_in}}'
+      eventName: '{{DLV - event_name}}'
+      measurementIdOverride: '{{C - GA4 measurement ID}}'
+  - name: GA4 - view_search_results
+    type: gaawe
+    folder: GA4
+    firing_triggers:
+      - CE - view_search_results
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      sendEcommerceData: false
+      enhancedUserId: false
+      eventSettingsTable:
+        - parameter: search_filters
+          parameterValue: '{{DLV - event_attributes.search_filters}}'
+        - parameter: search_query
+          parameterValue: '{{DLV - event_attributes.search_term}}'
+        - parameter: search_results_count
+          parameterValue: '{{DLV - event_attributes.search_results_count}}'
+        - parameter: sort_order
+          parameterValue: '{{DLV - event_attributes.sort_order}}'
+      eventName: view_search_results
+      measurementIdOverride: '{{C - GA4 measurement ID}}'
+  - name: GA4 - wishlist
+    type: gaawe
+    folder: GA4
+    firing_triggers:
+      - CE - track_event - wishlist
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      sendEcommerceData: false
+      enhancedUserId: false
+      eventSettingsTable:
+        - parameter: content_id
+          parameterValue: '{{DLV - event_attributes.item_id}}'
+        - parameter: item_variant
+          parameterValue: '{{DLV - event_attributes.item_variant}}'
+        - parameter: wishlist_id
+          parameterValue: '{{DLV - event_attributes.wishlist_id}}'
+      eventName: '{{DLV - event_name}}'
+      measurementIdOverride: '{{C - GA4 measurement ID}}'
+  - name: Google tag
+    type: googtag
+    folder: GA4
+    firing_triggers:
+      - {built_in: Initialization - All Pages}
+    tag_firing_option: ONCE_PER_EVENT
+    priority: 10
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      tagId: '{{C - GA4 measurement ID}}'
+      configSettingsTable:
+        - parameter: send_page_view
+          parameterValue: 'false'
+        - parameter: server_container_url
+          parameterValue: '{{LT - server container URL}}'

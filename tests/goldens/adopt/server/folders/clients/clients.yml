@@ -1,0 +1,13 @@
+tiggy: 1
+clients:
+  - name: GA4
+    type: gaaw_client
+    folder: Clients
+    parameter:
+      cookieDomain: auto
+      cookieMaxAgeInSec: '63072000'
+      activateDefaultPaths: true
+      cookiePath: /
+      migrateFromJsClientId: false
+      cookieManagement: server
+      cookieName: FPID

@@ -1,0 +1,26 @@
+tiggy: 1
+triggers:
+  - name: CE - Sign_up
+    type: CUSTOM_EVENT
+    custom_event_filter:
+      - type: EQUALS
+        parameter:
+          arg0: '{{_event}}'
+          arg1: Sign_up
+    notes: 'The old site pushed Sign_up, capitalised.'
+  - name: CE - sign_up
+    type: CUSTOM_EVENT
+    custom_event_filter:
+      - type: EQUALS
+        parameter:
+          arg0: '{{_event}}'
+          arg1: sign_up
+  - name: Click - All Elements
+    type: CLICK
+  - name: PV - /blog/ pages
+    type: PAGEVIEW
+    filter:
+      - type: STARTS_WITH
+        parameter:
+          arg0: '{{Page Path}}'
+          arg1: /blog/

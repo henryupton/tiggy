@@ -1,0 +1,15 @@
+tiggy: 1
+triggers:
+  - name: PV - production hosts
+    type: PAGEVIEW
+    filter:
+      - type: MATCH_REGEX
+        parameter:
+          arg0: '{{Page Hostname}}'
+          arg1: ^(www|app)\.example\.com$
+          ignore_case: true
+      - type: STARTS_WITH
+        parameter:
+          arg0: '{{Page Path}}'
+          arg1: /admin
+          negate: true

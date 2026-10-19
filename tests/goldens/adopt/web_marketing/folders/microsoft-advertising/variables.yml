@@ -1,0 +1,8 @@
+tiggy: 1
+variables:
+  - name: C - Microsoft UET tag ID
+    type: c
+    folder: Microsoft Advertising
+    format_value: {}
+    parameter:
+      value: '000000001'

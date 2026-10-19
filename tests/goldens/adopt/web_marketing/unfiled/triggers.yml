@@ -1,0 +1,23 @@
+tiggy: 1
+triggers:
+  - name: CE - cookie_consent_marketing
+    type: CUSTOM_EVENT
+    custom_event_filter:
+      - type: EQUALS
+        parameter:
+          arg0: '{{_event}}'
+          arg1: cookie_consent_marketing
+  - name: CE - purchase
+    type: CUSTOM_EVENT
+    custom_event_filter:
+      - type: EQUALS
+        parameter:
+          arg0: '{{_event}}'
+          arg1: purchase
+  - name: CE - sign_up
+    type: CUSTOM_EVENT
+    custom_event_filter:
+      - type: EQUALS
+        parameter:
+          arg0: '{{_event}}'
+          arg1: sign_up

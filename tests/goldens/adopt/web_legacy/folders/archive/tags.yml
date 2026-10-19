@@ -1,0 +1,27 @@
+tiggy: 1
+tags:
+  - name: HTML - Click tracking (old)
+    type: html
+    folder: Archive
+    firing_triggers:
+      - Click - All Elements
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      html: {$file: folders/archive/html-click-tracking-old.html}
+      supportDocumentWrite: false
+  - name: HTML - gtag.js (before the Google tag)
+    type: html
+    folder: Archive
+    firing_triggers:
+      - {built_in: All Pages}
+    paused: true
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      html: {$file: folders/archive/html-gtag-js-before-the-google-tag.html}
+      supportDocumentWrite: false

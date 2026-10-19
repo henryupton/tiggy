@@ -1,0 +1,51 @@
+tiggy: 1
+variables:
+  - name: ed - currency
+    type: ed
+    folder: Event Data
+    format_value: {}
+    parameter:
+      setDefaultValue: false
+      keyPath: currency
+  - name: ed - event_id
+    type: ed
+    folder: Event Data
+    format_value: {}
+    parameter:
+      setDefaultValue: false
+      keyPath: event_id
+  - name: ed - transaction_id
+    type: ed
+    folder: Event Data
+    format_value: {}
+    parameter:
+      setDefaultValue: false
+      keyPath: transaction_id
+  - name: ed - user_data.email_address
+    type: ed
+    folder: Event Data
+    format_value: {}
+    parameter:
+      setDefaultValue: false
+      keyPath: user_data.email_address
+  - name: ed - user_data.phone_number
+    type: ed
+    folder: Event Data
+    format_value: {}
+    parameter:
+      setDefaultValue: false
+      keyPath: user_data.phone_number
+  - name: ed - user_id
+    type: ed
+    folder: Event Data
+    format_value: {}
+    parameter:
+      setDefaultValue: false
+      keyPath: user_id
+  - name: ed - value
+    type: ed
+    folder: Event Data
+    format_value: {}
+    parameter:
+      setDefaultValue: false
+      keyPath: value

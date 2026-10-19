@@ -1,0 +1,28 @@
+tiggy: 1
+tags:
+  - name: Cookiebot CMP
+    type: {template: Cookiebot CMP}
+    folder: Consent
+    firing_triggers:
+      - {built_in: Consent Initialization - All Pages}
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_NEEDED
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      serial: 00000000-0000-4000-8000-000000000000
+      enableConsentMode: true
+      waitForUpdate: '500'
+      defaultConsent:
+        - region: 'EU,EEA,GB'
+          ad_storage: denied
+          analytics_storage: denied
+          ad_user_data: denied
+          ad_personalization: denied
+        - region: ''
+          ad_storage: denied
+          analytics_storage: granted
+          ad_user_data: denied
+          ad_personalization: denied
+      adsDataRedaction: true
+      urlPassthrough: false

@@ -1,0 +1,10 @@
+tiggy: 1
+custom_templates:
+  - name: Cookiebot CMP
+    gallery_reference:
+      host: github.com
+      owner: example-cmp
+      repository: cookiebot-cmp-template
+      version: 5f1e2d3c4b5a69788796a5b4c3d2e1f0a9b8c7d6
+      signature: 0f9e8d7c6b5a49382716f5e4d3c2b1a00f1e2d3c4b5a69788796a5b4c3d2e1f0
+    template_data: {$file: custom_templates/cookiebot-cmp.tpl}

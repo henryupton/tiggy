@@ -1,0 +1,53 @@
+tiggy: 1
+triggers:
+  - name: CE - sign_up
+    type: CUSTOM_EVENT
+    folder: Triggers
+    custom_event_filter:
+      - type: EQUALS
+        parameter:
+          arg0: '{{_event}}'
+          arg1: sign_up
+  - name: CE - track_event
+    type: CUSTOM_EVENT
+    folder: Triggers
+    custom_event_filter:
+      - type: EQUALS
+        parameter:
+          arg0: '{{_event}}'
+          arg1: track_event
+    notes: Every dictionary event arrives as track_event; no event allowlist.
+  - name: CE - track_event - file_download
+    type: CUSTOM_EVENT
+    folder: Triggers
+    custom_event_filter:
+      - type: EQUALS
+        parameter:
+          arg0: '{{_event}}'
+          arg1: track_event
+    filter:
+      - type: EQUALS
+        parameter:
+          arg0: '{{DLV - event_name}}'
+          arg1: file_download
+  - name: CE - track_event - wishlist
+    type: CUSTOM_EVENT
+    folder: Triggers
+    custom_event_filter:
+      - type: EQUALS
+        parameter:
+          arg0: '{{_event}}'
+          arg1: track_event
+    filter:
+      - type: MATCH_REGEX
+        parameter:
+          arg0: '{{DLV - event_name}}'
+          arg1: ^(add_to|remove_from)_wishlist$
+  - name: CE - view_search_results
+    type: CUSTOM_EVENT
+    folder: Triggers
+    custom_event_filter:
+      - type: EQUALS
+        parameter:
+          arg0: '{{_event}}'
+          arg1: view_search_results

@@ -1,0 +1,8 @@
+tiggy: 1
+variables:
+  - name: C - LinkedIn partner ID
+    type: c
+    folder: LinkedIn
+    format_value: {}
+    parameter:
+      value: '0000001'

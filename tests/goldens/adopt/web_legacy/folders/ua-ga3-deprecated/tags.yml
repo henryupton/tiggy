@@ -1,0 +1,54 @@
+tiggy: 1
+tags:
+  - name: 'HTML - analytics.js (UA, old)'
+    type: html
+    folder: UA / GA3 (deprecated)
+    firing_triggers:
+      - {built_in: All Pages}
+    paused: true
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      html: {$file: folders/ua-ga3-deprecated/html-analytics-js-ua-old.html}
+      supportDocumentWrite: false
+  - name: UA - Event - Sign_up
+    type: ua
+    folder: UA / GA3 (deprecated)
+    firing_triggers:
+      - CE - Sign_up
+    paused: true
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      enableEcommerce: false
+      setTrackerName: false
+      doubleClick: false
+      useDebugVersion: 'false'
+      trackingId: '{{C - UA property ID}}'
+      trackType: TRACK_EVENT
+      enableLinkId: false
+      eventCategory: Account
+      eventAction: Sign up
+  - name: UA - Pageview
+    type: ua
+    folder: UA / GA3 (deprecated)
+    firing_triggers:
+      - {built_in: All Pages}
+    paused: true
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    notes: Paused when Universal Analytics stopped processing; kept for reference.
+    parameter:
+      enableEcommerce: false
+      setTrackerName: false
+      doubleClick: false
+      useDebugVersion: 'false'
+      trackingId: '{{C - UA property ID}}'
+      trackType: TRACK_PAGEVIEW
+      enableLinkId: false

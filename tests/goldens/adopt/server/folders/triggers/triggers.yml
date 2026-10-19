@@ -1,0 +1,49 @@
+tiggy: 1
+triggers:
+  - name: Client - GA4
+    type: ALWAYS
+    folder: Triggers
+    filter:
+      - type: EQUALS
+        parameter:
+          arg0: '{{Client Name}}'
+          arg1: GA4
+      - type: STARTS_WITH
+        parameter:
+          arg0: '{{Request Path}}'
+          arg1: /g/collect
+  - name: Event - page_view_anon
+    type: ALWAYS
+    folder: Triggers
+    filter:
+      - type: EQUALS
+        parameter:
+          arg0: '{{Event Name}}'
+          arg1: page_view_anon
+    notes: 'Consentless page views: counted by the first-party collector, never sent to GA4.'
+  - name: GA4 - purchase
+    type: CUSTOM_EVENT
+    folder: Triggers
+    custom_event_filter:
+      - type: EQUALS
+        parameter:
+          arg0: '{{_event}}'
+          arg1: purchase
+    filter:
+      - type: EQUALS
+        parameter:
+          arg0: '{{Client Name}}'
+          arg1: GA4
+  - name: GA4 - sign_up
+    type: CUSTOM_EVENT
+    folder: Triggers
+    custom_event_filter:
+      - type: EQUALS
+        parameter:
+          arg0: '{{_event}}'
+          arg1: sign_up
+    filter:
+      - type: EQUALS
+        parameter:
+          arg0: '{{Client Name}}'
+          arg1: GA4

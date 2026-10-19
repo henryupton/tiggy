@@ -1,0 +1,17 @@
+tiggy: 1
+tags:
+  - name: GA4
+    type: sgtmgaaw
+    folder: GA4
+    firing_triggers:
+      - Client - GA4
+    blocking_triggers:
+      - Event - page_view_anon
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      redactVisitorIp: false
+      epToIncludeDropdown: all
+      upToIncludeDropdown: all

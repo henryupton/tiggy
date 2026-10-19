@@ -1,0 +1,8 @@
+tiggy: 1
+variables:
+  - name: C - UA property ID
+    type: c
+    folder: UA / GA3 (deprecated)
+    format_value: {}
+    parameter:
+      value: UA-000000-1

@@ -1,0 +1,14 @@
+tiggy: 1
+variables:
+  - name: const - meta api token
+    type: c
+    folder: Settings
+    format_value: {}
+    parameter:
+      value: TEST_TOKEN_NOT_A_SECRET
+  - name: const - meta pixel id
+    type: c
+    folder: Settings
+    format_value: {}
+    parameter:
+      value: '000000000000001'

@@ -1,0 +1,9 @@
+tiggy: 1
+variables:
+  - name: Cookie - internal_user
+    type: k
+    folder: Exclusions
+    format_value: {}
+    parameter:
+      decodeCookie: false
+      name: internal_user

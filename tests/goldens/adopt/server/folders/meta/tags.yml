@@ -1,0 +1,78 @@
+tiggy: 1
+tags:
+  - name: Meta CAPI - CompleteRegistration
+    type: {template: Meta Conversions API}
+    folder: Meta
+    firing_triggers:
+      - GA4 - sign_up
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      logType: debug
+      adStorageConsent: required
+      eventNameStandard: CompleteRegistration
+      generateFbp: true
+      userDataList:
+        - name: em
+          value: '{{ed - user_data.email_address}}'
+        - name: ph
+          value: '{{ed - user_data.phone_number}}'
+        - name: external_id
+          value: '{{ed - user_id}}'
+      accessToken: '{{const - meta api token}}'
+      inheritEventName: override
+      actionSource: website
+      pixelId: '{{const - meta pixel id}}'
+      useHttpOnlyCookie: false
+      itemIdKey: null
+      customDataList: {$type: LIST}
+      useOptimisticScenario: false
+      eventName: standard
+      serverEventDataList:
+        - name: event_id
+          value: '{{ed - event_id}}'
+      enableEventEnhancement: true
+      enableMultipixelSetup: false
+  - name: Meta CAPI - Purchase
+    type: {template: Meta Conversions API}
+    folder: Meta
+    firing_triggers:
+      - GA4 - purchase
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      logType: debug
+      adStorageConsent: required
+      eventNameStandard: Purchase
+      generateFbp: true
+      userDataList:
+        - name: em
+          value: '{{ed - user_data.email_address}}'
+        - name: ph
+          value: '{{ed - user_data.phone_number}}'
+        - name: external_id
+          value: '{{ed - user_id}}'
+      accessToken: '{{const - meta api token}}'
+      inheritEventName: override
+      actionSource: website
+      pixelId: '{{const - meta pixel id}}'
+      useHttpOnlyCookie: false
+      itemIdKey: null
+      customDataList:
+        - name: value
+          value: '{{ed - value}}'
+        - name: currency
+          value: '{{ed - currency}}'
+        - name: order_id
+          value: '{{ed - transaction_id}}'
+      useOptimisticScenario: false
+      eventName: standard
+      serverEventDataList:
+        - name: event_id
+          value: '{{ed - event_id}}'
+      enableEventEnhancement: true
+      enableMultipixelSetup: false

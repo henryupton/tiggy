@@ -1,0 +1,31 @@
+tiggy: 1
+variables:
+  - name: DLV - ecommerce.items
+    type: v
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: ecommerce.items
+  - name: DLV - event_attributes.legacy_id
+    type: v
+    format_value: {}
+    parameter:
+      dataLayerVersion: 2
+      setDefaultValue: false
+      name: event_attributes.legacy_id
+  - name: DLV - pageCategory
+    type: v
+    format_value: {}
+    notes: Pushed by the old CMS templates; the current site never sets it.
+    parameter:
+      dataLayerVersion: 1
+      setDefaultValue: false
+      name: pageCategory
+  - name: DLV - userType
+    type: v
+    format_value: {}
+    parameter:
+      dataLayerVersion: 1
+      setDefaultValue: false
+      name: userType

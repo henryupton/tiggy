@@ -5,7 +5,13 @@ on:
     tags: ["v*"]
 
 jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
   publish:
+    needs: ci
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -28,6 +34,10 @@ jobs:
       - run: uv build
 
       - name: Smoke-test the wheel
-        run: uv run --isolated --no-project --with dist/*.whl tiggy --version
+        run: |
+          tiggy() { uv run --isolated --no-project --with dist/*.whl tiggy "$@"; }
+          tiggy --version
+          tiggy import tests/fixtures/cdm/web_analytics.json "$RUNNER_TEMP/spec"
+          tiggy import tests/fixtures/cdm/web_analytics.json "$RUNNER_TEMP/spec" --check
 
       - run: uv publish

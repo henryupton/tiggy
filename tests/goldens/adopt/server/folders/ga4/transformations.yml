@@ -1,0 +1,14 @@
+tiggy: 1
+transformations:
+  - name: Exclude phone number from GA4
+    type: tf_exclude_params
+    folder: GA4
+    parameter:
+      excludedParamsTable:
+        - excludedParams: user_data.phone_number
+      matchingConditionsEnabled: false
+      allTagsExcept: false
+      booleanExpressionString: null
+      affectedTags:
+        - tagReference: {$type: TAG_REFERENCE, $value: GA4, $is_weak_reference: false}
+      affectedTagTypes: {$type: LIST}

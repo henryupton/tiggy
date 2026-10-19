@@ -1,0 +1,14 @@
+<script>
+  (function (w, d, src) {
+    w.uetq = w.uetq || [];  
+    var s = d.createElement('script');
+    s.async = true;
+    s.src = src;
+    s.onload = function () {
+      var queue = new w.UET({ti: '{{C - Microsoft UET tag ID}}', q: w.uetq});
+      w.uetq = queue;
+      w.uetq.push('pageLoad');
+    };
+    d.head.appendChild(s);
+  })(window, document, 'https://uet.example.net/bat.js');
+</script>

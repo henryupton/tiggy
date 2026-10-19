@@ -8,7 +8,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "Henry Upton", email = "henryupton@gmail.com" }]
 requires-python = ">=3.11"
 dependencies = [
-    "click>=8.1",
+    "click>=8.1.2",
     "pydantic>=2.9",
     "ruamel-yaml>=0.18,<0.20",
 ]
@@ -36,7 +36,19 @@ module-name = "tiggy"
 
 [dependency-groups]
 dev = [
+    "hypothesis>=6.100",
+    "pre-commit-hooks==6.0.0",
+    "pytest>=8.3",
+    "pyyaml>=6.0.2",
     "ruff>=0.17.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+xfail_strict = true
+markers = [
+    "slow: runs the CLI many times or over large inputs; deselect with -m 'not slow'",
 ]
 
 [tool.ruff]

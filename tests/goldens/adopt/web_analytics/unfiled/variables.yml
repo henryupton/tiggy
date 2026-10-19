@@ -1,0 +1,22 @@
+tiggy: 1
+variables:
+  - name: LT - server container URL
+    type: smm
+    format_value: {}
+    parameter:
+      setDefaultValue: true
+      input: '{{Page Hostname}}'
+      defaultValue: https://sgtm.example.com
+      map:
+        - key: www.example.com
+          value: https://sgtm.example.com
+        - key: app.example.com
+          value: https://sgtm.example.com
+        - key: staging.example.org
+          value: https://sgtm.staging.example.org
+  - name: URL - utm_campaign
+    type: u
+    format_value: {}
+    parameter:
+      component: QUERY
+      queryKey: utm_campaign

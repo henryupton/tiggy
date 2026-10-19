@@ -1,0 +1,9 @@
+tiggy: 1
+variables:
+  - name: CJS - first-party payload
+    type: jsm
+    folder: First-party
+    format_value: {}
+    notes: 'Keys under // Event stay in alphabetical order, one per event attribute.'
+    parameter:
+      javascript: {$file: folders/first-party/cjs-first-party-payload.js}

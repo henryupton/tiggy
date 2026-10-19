@@ -1,0 +1,4 @@
+tiggy: 1
+custom_templates:
+  - name: Amplitude Event
+    template_data: {$file: custom_templates/amplitude-event.tpl}

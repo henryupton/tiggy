@@ -1,0 +1,60 @@
+tiggy: 1
+tags:
+  - name: GA4 - sign_up
+    type: gaawe
+    firing_triggers:
+      - CE - sign_up
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      sendEcommerceData: false
+      enhancedUserId: false
+      eventName: sign_up
+      measurementIdOverride: G-TEST000004
+  - name: Google tag - G-TEST000004
+    type: googtag
+    firing_triggers:
+      - {built_in: All Pages}
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      tagId: G-TEST000004
+  - name: HTML - Chat widget / support bubble
+    type: html
+    firing_triggers:
+      - {built_in: All Pages}
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    notes: The chat contract ended; the widget still loads.
+    parameter:
+      html: {$file: unfiled/html-chat-widget-support-bubble.html}
+      supportDocumentWrite: false
+  - name: 'HTML - Session recording snippet pasted from the vendor''s onboarding email; ask the web team before editing, and keep it for the yearly audit - copy A'
+    type: html
+    firing_triggers:
+      - {built_in: All Pages}
+    paused: true
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      html: {$file: unfiled/html-session-recording-snippet-pasted-from-the-vendor-s-onboarding-email-ask-the.html}
+      supportDocumentWrite: false
+  - name: 'HTML - Session recording snippet pasted from the vendor''s onboarding email; ask the web team before editing, and keep it for the yearly audit - copy B'
+    type: html
+    firing_triggers:
+      - {built_in: All Pages}
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      html: {$file: unfiled/html-session-recording-snippet-pasted-from-the-vendor-s-onboarding-email-ask-the-2.html}
+      supportDocumentWrite: false

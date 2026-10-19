@@ -1,0 +1,10 @@
+Example - Analytics: 11 tags, 6 triggers, 30 variables, 2 templates
+
+✗ tag "GA4 - file_download"  folders/ga4/tags.yml:3
+    eventSettingsTable[3].parameterValue: {{DLV - event_attributes.licence_type}} is not a variable or an enabled built-in (did you mean "DLV - event_attributes.license_type"?)  [unknown-variable]
+✗ tag "GA4 - track_event"  folders/ga4/tags.yml:64
+    eventSettingsTable[8].parameterValue: {{Click URL}} is a built-in variable that isn't enabled  [built-in-not-enabled]
+✗ variable "CJS - first-party payload"  folders/first-party/variables.yml:3
+    javascript: {{DLV - event_attributes.coupon_code}} is not a variable or an enabled built-in (did you mean "DLV - event_attributes.sort_order"?)  [unknown-variable]
+
+3 errors, 0 warnings

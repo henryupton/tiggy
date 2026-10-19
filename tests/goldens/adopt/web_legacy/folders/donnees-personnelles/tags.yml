@@ -1,0 +1,14 @@
+tiggy: 1
+tags:
+  - name: タグ - 日本語ブログ
+    type: html
+    folder: Données personnelles
+    firing_triggers:
+      - PV - /blog/ pages
+    tag_firing_option: ONCE_PER_EVENT
+    consent_settings:
+      consent_status: NOT_SET
+    monitoring_metadata: {$type: MAP}
+    parameter:
+      html: {$file: folders/donnees-personnelles/code.html}
+      supportDocumentWrite: false
