@@ -231,7 +231,7 @@ def import_(source: Path, spec_dir: Path, check_only: bool) -> None:
     try:
         result = import_version(read.raw_version, spec_dir)
     except SpecError as e:
-        raise InputError(_problems(e)) from e
+        raise InputError(_problems(e, spec_dir)) from e
     except ImportError_ as e:
         raise InputError(str(e)) from e
     counts = ", ".join(f"{n} {key.replace('_', ' ')}" for key, n in result.counts.items())
