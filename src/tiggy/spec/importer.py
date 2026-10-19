@@ -17,22 +17,21 @@ from typing import Any
 from pydantic import ValidationError
 
 from tiggy.gtm.resources import BuiltInVariable, Container, ContainerVersion, CustomTemplate
-from tiggy.secrets import Fetching, Offline, SecretRef, distinctive, is_placeholder, secret_bearing
-from tiggy.spec import canon, layout
+from tiggy.secrets import Fetching, Offline, SecretRef, distinctive, secret_bearing
+from tiggy.spec import canon, diff, layout
 from tiggy.spec.codec import Codec, dotted
 from tiggy.spec.compiler import compile_spec
 from tiggy.spec.convert import to_spec
+from tiggy.spec.diff import Diff
 from tiggy.spec.layout import SpecObject
 from tiggy.spec.loader import KINDS, LOCK, load_spec
-from tiggy.spec.overlay import CODE_PARAMETERS, COLLECTIONS, TEMPLATE_DATA_EXTENSION, fields
+from tiggy.spec.overlay import CODE_PARAMETERS, COLLECTIONS, TEMPLATE_DATA_EXTENSION
 from tiggy.spec.problems import Problem, SpecError
 from tiggy.spec.refs import ImportRefs
 from tiggy.spec.yamlio import Map, YamlError, render, unrepresentable
 
 GITATTRIBUTES = "*.tpl -text\n*.html -text\n*.js -text\n"
 EDITORCONFIG = "[*.{tpl,html,js}]\ntrim_trailing_whitespace = false\ninsert_final_newline = false\n"
-VERSION_FIELDS = {f.alias: f.key for f in fields(ContainerVersion)}
-SIDES = ("the container", "the spec")
 REFERENCE = re.compile(r"\{\{([^{}]+)\}\}")
 AROUND_REFERENCES = re.compile(r"(?i)\s*(?:bearer|basic)?[\W_]*")  # what a credential holds besides them
 TABLES = {"smm", "remm"}  # lookup and regex tables
@@ -229,22 +228,22 @@ def _stage(staging: Path, files: dict[str, bytes], source: dict[str, Any], secre
 
 @dataclass
 class Comparison:
-    differences: list[str]  # empty when the container and the spec are equivalent
+    diff: Diff  # no changes when the container and the spec are equivalent
     warnings: list[Problem]  # about the spec's files, which don't affect equivalence
-    unread_secrets: int = 0  # secret values not compared, since none were fetched
 
 
-def check(source: dict[str, Any], spec_dir: Path, secrets: Fetching | None = None) -> Comparison:
+def check(
+    source: dict[str, Any], spec_dir: Path, secrets: Fetching | None = None, exact: bool = False
+) -> Comparison:
     """What differs between a ContainerVersion as exported and a spec, secrets fetched by `secrets`.
 
     Without `secrets`, nothing is fetched: a secret only has to have some value in the export. With it,
     each is compared with what it fetches, and either way no secret's value is ever shown.
     """
     _preconditions(source)
-    exported = find_secrets(source)
-    left = canon.canon(source)
     offline = Offline()
-    compiled = compile_spec(load_spec(spec_dir), offline)
+    spec = load_spec(spec_dir)
+    compiled = compile_spec(spec, offline)
     values = None
     if secrets is not None:
         values = {ref.placeholder: secrets(ref, origin) for ref, origin in offline.refs.items()}
@@ -254,32 +253,11 @@ def check(source: dict[str, Any], spec_dir: Path, secrets: Fetching | None = Non
             f"{spec_dir} is the spec for container {expected}, but the export is of "
             f"{found or 'a container with no public ID'}"
         )
+    known = tuple(find_secrets(source).values.values())
     try:
-        right = canon.canon(canon.dump(compiled.version))
+        return Comparison(diff.compare(source, compiled, spec, values, known, exact), compiled.warnings)
     except canon.CanonError as e:
         raise ImportError_(f"can't compare with {spec_dir}: {e}") from e
-    left, unread = _masked(left, right, values)
-    # The export may hold a secret where the spec has none, pasted into a field in the UI, say.
-    left, right = _hidden(left, exported.names), _hidden(right, exported.names)
-    differences = []
-    for key in sorted(set(left) | set(right)):
-        name = COLLECTIONS[key][0] if key in COLLECTIONS else VERSION_FIELDS.get(key, key)
-        if key not in right:
-            differences.append(f"{name}: only in the container")
-        elif key not in left:
-            differences.append(f"{name}: only in the spec")
-        elif key in COLLECTIONS and isinstance(left[key], dict) and isinstance(right[key], dict):
-            a, b = left[key], right[key]
-            for identity in sorted(set(a) | set(b), key=str):
-                if identity not in b:
-                    differences.append(f"{name} {identity!r}: only in the container")
-                elif identity not in a:
-                    differences.append(f"{name} {identity!r}: only in the spec")
-                elif found := canon.difference(a[identity], b[identity], sides=SIDES):
-                    differences.append(f"{name} {identity!r}: {found}")
-        elif found := canon.difference(left[key], right[key], sides=SIDES):
-            differences.append(f"{name}: {found}")
-    return Comparison([exported.masked(_shown(d)) for d in differences], compiled.warnings, unread)
 
 
 def _shown(difference: str) -> str:
@@ -293,28 +271,6 @@ def _hidden(node: Any, names: dict[str, str]) -> Any:
     if isinstance(node, list):
         return [_hidden(value, names) for value in node]
     return SecretRef(names[node]).placeholder if isinstance(node, str) and node in names else node
-
-
-def _masked(left: Any, right: Any, values: dict[str, str] | None) -> tuple[Any, int]:
-    """`left` with the value at each of the spec's secrets replaced by the secret's stand-in.
-
-    Without `values`, any non-empty value counts as the secret, unread. With them, a value that isn't
-    the secret's becomes a second stand-in, so the difference shows without showing either value.
-    """
-    if is_placeholder(right) and isinstance(left, str):
-        if values is None:
-            return (right, 1) if left else (left, 0)
-        return (right, 0) if values.get(right) == left else (f"{right}, not the stored value", 0)
-    if isinstance(left, dict) and isinstance(right, dict):
-        out, count = {}, 0
-        for key, value in left.items():
-            out[key], n = _masked(value, right[key], values) if key in right else (value, 0)
-            count += n
-        return out, count
-    if isinstance(left, list) and isinstance(right, list) and len(left) == len(right):
-        pairs = [_masked(a, b, values) for a, b in zip(left, right, strict=True)]
-        return [value for value, _ in pairs], sum(n for _, n in pairs)
-    return left, 0
 
 
 def _public_id(version: ContainerVersion) -> str | None:

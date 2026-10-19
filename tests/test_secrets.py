@@ -15,6 +15,7 @@ import pytest
 
 from tests.conftest import (
     FIXTURES,
+    Result,
     export_secrets,
     fragment_of,
     load_export,
@@ -664,9 +665,22 @@ def test_resolving_secrets_finds_the_rotated_token_without_printing_either_value
 
     assert result.code == 1, result
     assert result.out.splitlines()[0] == (
-        f"≠ variables 'const - meta api token': parameter[0].value"
+        f"≠ variables 'const - meta api token': parameter.value"
         f" (<secret {NAME}, not the stored value> in the container, <secret {NAME}> in the spec)"
+        "  folders/settings/variables.yml:8"
     ), result
+    assert TOKEN not in result.out + result.err and "ROTATED_IN_THE_UI" not in result.out + result.err
+
+
+def test_resolving_secrets_in_json_marks_the_containers_token_as_not_the_stored_one(imported, tmp_path: Path):
+    spec, live = imported(SERVER), _server(tmp_path, _rotated)
+    env = secret_store(tmp_path / "store", {NAME: TOKEN})
+
+    result = run_tiggy("import", live, spec, "--check", "--resolve-secrets", "--format", "json", env=env)
+
+    (found,) = json.loads(result.out)["differences"]
+    assert result.code == 1, result
+    assert (found["container"], found["spec"]) == ({"$secret": NAME, "stored": False}, {"$secret": NAME})
     assert TOKEN not in result.out + result.err and "ROTATED_IN_THE_UI" not in result.out + result.err
 
 
@@ -733,6 +747,222 @@ def test_resolve_secrets_needs_check_and_a_store(imported, tmp_path: Path, args)
 
     assert result.code == 2, result
     assert result.err == "Error: --resolve-secrets is for --check, with --targets naming the secret store\n"
+
+
+# import --check in every format: a difference near a secret says so, never what it holds
+
+FORMATS = ["text", "json", "github"]
+
+
+def _export(tmp_path: Path, name: str, *edits) -> Path:
+    data = load_export(SERVER)
+    for edit in edits:
+        edit(data["containerVersion"])
+    return write_export(data, tmp_path / name)
+
+
+def _checked(spec: Path, live: Path, fmt: str) -> tuple[Result, list[str]]:
+    """The run, and each difference as `kind 'name': message` from whichever format printed it."""
+    result = run_tiggy("import", live, spec, "--check", "--format", fmt, env={"TIGGY_TARGETS": None})
+    if fmt == "json":
+        payload = json.loads(result.out)
+        return result, [f"{d['kind']} {d['name']!r}: {d['message']}" for d in payload["differences"]]
+    lines = result.out.splitlines()[:-1]
+    if fmt == "github":
+        return result, [line.split("::", 2)[2] for line in lines]
+    return result, [line.removeprefix("≠ ").rsplit("  ", 1)[0] for line in lines]
+
+
+def _pasted(version: dict[str, Any]) -> None:
+    _param(_tag(version, "Meta CAPI - Purchase"), "accessToken")["value"] = "PASTED_TOKEN"
+
+
+@pytest.mark.parametrize("fmt", FORMATS)
+def test_a_token_rotated_behind_a_new_parameter_stays_unread_and_unshown(fmt, imported, tmp_path: Path):
+    """A template update puts its test event code ahead of a token pasted into the tag, which is then
+    rotated. The token still pairs with its secret by key, so it is unread, not a difference."""
+
+    def updated_and_rotated(version):
+        parameters = _tag(version, "Meta CAPI - Purchase")["parameter"]
+        token = _param(_tag(version, "Meta CAPI - Purchase"), "accessToken")
+        token["value"] = "ROTATED_IN_THE_UI"
+        parameters.insert(
+            parameters.index(token), {"type": "TEMPLATE", "key": "testEventCode", "value": "TEST1"}
+        )
+
+    spec = imported(_export(tmp_path, "pasted.json", _pasted))
+    live = _export(tmp_path, "live.json", _pasted, updated_and_rotated)
+
+    result, found = _checked(spec, live, fmt)
+
+    assert result.code == 1, result
+    assert found == ["tags 'Meta CAPI - Purchase': parameter.testEventCode (missing from the spec)"], result
+    assert result.err == UNREAD.replace("1 secret value", "2 secret values"), result
+    if fmt == "json":
+        assert json.loads(result.out)["summary"]["unreadSecrets"] == 2
+    assert "PASTED_TOKEN" not in result.out + result.err and "ROTATED" not in result.out + result.err
+
+
+@pytest.mark.parametrize("fmt", FORMATS)
+def test_a_token_in_a_row_only_the_container_has_shows_only_as_a_secret(fmt, imported, tmp_path: Path):
+    """The spec keeps a partner token in a table as {$secret: partner-token}; in GTM, a second one is
+    added as a row of its own. That row is drift, and a value in the secret's column shows as the secret."""
+    spec = imported(SERVER)
+    replace_in_spec(
+        spec,
+        "folders/meta/tags.yml",
+        "          value: '{{ed - transaction_id}}'\n",
+        "          value: '{{ed - transaction_id}}'\n"
+        "        - name: partner_token\n"
+        "          value: {$secret: partner-token}\n",
+    )
+
+    def second_partner(version):
+        rows = _param(_tag(version, "Meta CAPI - Purchase"), "customDataList")["list"]
+        for name, token in (("partner_token", "PARTNER_TOKEN_ONE"), ("partner_token_2", "PARTNER_TOKEN_TWO")):
+            cells = [
+                {"type": "TEMPLATE", "key": "name", "value": name},
+                {"type": "TEMPLATE", "key": "value", "value": token},
+            ]
+            rows.append({"type": "MAP", "map": cells})
+
+    result, found = _checked(spec, _export(tmp_path, "live.json", second_partner), fmt)
+
+    assert result.code == 1, result
+    assert found == [
+        "tags 'Meta CAPI - Purchase': parameter.customDataList[4]"
+        ' ({"name": "partner_token_2", "value": "<secret partner-token>"} only in the container)'
+    ], result
+    if fmt == "json":
+        (row,) = json.loads(result.out)["differences"]
+        assert row["container"] == {"name": "partner_token_2", "value": {"$secret": "partner-token"}}
+    assert "PARTNER_TOKEN_" not in result.out + result.err
+
+
+@pytest.mark.parametrize("fmt", FORMATS)
+def test_a_token_written_into_the_spec_against_another_in_gtm_shows_only_the_specs(
+    fmt, imported, tmp_path: Path
+):
+    """Written out in the spec, a token is already the repository's to show; the container's is a secret."""
+    spec = imported(SERVER)
+    replace_in_spec(
+        spec,
+        "folders/meta/tags.yml",
+        "accessToken: '{{const - meta api token}}'",
+        "accessToken: SPEC_PASTED_TOKEN",
+        count=2,
+    )
+
+    def pasted_in_gtm(version):
+        for name in ("Meta CAPI - Purchase", "Meta CAPI - CompleteRegistration"):
+            _param(_tag(version, name), "accessToken")["value"] = "GTM_PASTED_TOKEN"
+
+    result, found = _checked(spec, _export(tmp_path, "live.json", pasted_in_gtm), fmt)
+
+    assert result.code == 1, result
+    assert found == [
+        f"tags '{name}': parameter.accessToken (<secret> in the container, 'SPEC_PASTED_TOKEN' in the spec)"
+        for name in ("Meta CAPI - CompleteRegistration", "Meta CAPI - Purchase")
+    ], result
+    if fmt == "json":
+        assert [d["container"] for d in json.loads(result.out)["differences"]] == [{"$secret": None}] * 2
+    assert "GTM_PASTED_TOKEN" not in result.out + result.err
+
+
+PARTNER = "PARTNER_TKN"  # short, so a value cut short in a message still shows it whole
+
+
+def _text(key: str, value: str) -> dict[str, Any]:
+    return {"type": "TEMPLATE", "key": key, "value": value}
+
+
+def _as_a_map(parameters: list[dict[str, Any]]) -> None:
+    parameters.append({"type": "MAP", "key": "pc", "map": [_text("primary", PARTNER)]})
+
+
+def _as_a_list(parameters: list[dict[str, Any]]) -> None:
+    parameters.append({"type": "LIST", "key": "pc", "list": [{"type": "TEMPLATE", "value": PARTNER}]})
+
+
+def _under_another_key(parameters: list[dict[str, Any]]) -> None:
+    parameters.append(_text("pc2", PARTNER))
+
+
+def _beside_a_repeated_key(parameters: list[dict[str, Any]]) -> None:
+    """A repeated key stops the parameters pairing by key, so they compare as one list, the token first."""
+    parameters.insert(0, _text("pc", PARTNER))
+    parameters.append(_text("logType", "debug"))
+
+
+@pytest.mark.parametrize("fmt", FORMATS)
+@pytest.mark.parametrize(
+    "held", [_as_a_map, _as_a_list, _under_another_key, _beside_a_repeated_key], ids=lambda f: f.__name__[1:]
+)
+def test_a_token_gtm_holds_in_another_shape_or_place_is_never_printed(held, fmt, imported, tmp_path: Path):
+    """The spec keeps a partner credential as {$secret: partner} under a key no rule calls secret (`pc`), so
+    only the spec says it is one; however GTM comes to hold it, no format prints it."""
+    spec = imported(SERVER)
+    replace_in_spec(
+        spec,
+        "folders/meta/tags.yml",
+        "      eventNameStandard: Purchase\n",
+        "      eventNameStandard: Purchase\n      pc: {$secret: partner}\n",
+    )
+
+    def edit(version):
+        held(_tag(version, "Meta CAPI - Purchase")["parameter"])
+
+    result, found = _checked(spec, _export(tmp_path, "live.json", edit), fmt)
+
+    assert result.code == 1 and found, result
+    assert PARTNER not in result.out + result.err
+
+
+@pytest.mark.parametrize("fmt", FORMATS)
+def test_tokens_in_rows_shaped_unlike_the_specs_secret_are_never_printed(fmt, imported, tmp_path: Path):
+    """The spec lists one secret where GTM holds two rows, each a mapping: rows only one side has show whole,
+    and whatever shape a row takes, it is still within the parameter the spec keeps a secret in."""
+    spec = imported(SERVER)
+    replace_in_spec(
+        spec,
+        "folders/meta/tags.yml",
+        "      eventNameStandard: Purchase\n",
+        "      eventNameStandard: Purchase\n      pc: [{$secret: partner}]\n",
+    )
+
+    def as_rows(version):
+        rows = [{"type": "MAP", "map": [_text("primary", f"{PARTNER}_{n}")]} for n in (1, 2)]
+        _tag(version, "Meta CAPI - Purchase")["parameter"].append({"type": "LIST", "key": "pc", "list": rows})
+
+    result, found = _checked(spec, _export(tmp_path, "live.json", as_rows), fmt)
+
+    assert result.code == 1, result
+    row = '{"primary": "<secret partner>"}'
+    assert [f for f in found if "only in the container" in f] == [
+        f"tags 'Meta CAPI - Purchase': parameter.pc[{n}] ({row} only in the container)" for n in (0, 1)
+    ], result
+    assert PARTNER not in result.out + result.err
+
+
+@pytest.mark.parametrize("fmt", FORMATS)
+def test_a_token_constant_turned_into_a_lookup_table_is_never_printed(fmt, imported, tmp_path: Path):
+    """Offline, nothing says the table's value is the token the constant held: text says only that the key is
+    missing from the spec, and no format says more."""
+
+    def by_hostname(version):
+        constant = next(v for v in version["variable"] if v["name"] == "const - meta api token")
+        row = {"type": "MAP", "map": [_text("key", "www.example.com"), _text("value", TOKEN)]}
+        constant["type"] = "smm"
+        constant["parameter"] = [
+            _text("input", "{{Page Hostname}}"),
+            {"type": "LIST", "key": "map", "list": [row]},
+        ]
+
+    result, found = _checked(imported(SERVER), _export(tmp_path, "live.json", by_hostname), fmt)
+
+    assert result.code == 1, result
+    assert "variables 'const - meta api token': parameter.map (missing from the spec)" in found, result
+    assert TOKEN not in result.out + result.err
 
 
 def test_an_import_that_loses_a_secret_says_where_without_printing_it(tmp_path: Path, monkeypatch):

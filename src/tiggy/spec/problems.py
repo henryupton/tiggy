@@ -80,17 +80,36 @@ def difference(
             if found:
                 return found
         return None
-    if isinstance(a, str) and isinstance(b, str) and a != b and max(len(repr(a)), len(repr(b))) > 80:
-        i = next((i for i, (x, y) in enumerate(zip(a, b)) if x != y), min(len(a), len(b)))
-        line, column = a.count("\n", 0, i) + 1, i - (a.rfind("\n", 0, i) + 1) + 1
-        window = slice(max(0, i - 20), i + 40)
+    if isinstance(a, str) and isinstance(b, str) and a != b and long(a, b):
+        w = window(a, b)
         return (
-            f"{path or '(root)'} (from line {line}, character {column}: "
-            f"{a[window]!r} in {sides[0]}, {b[window]!r} in {sides[1]})"
+            f"{path or '(root)'} (from line {w.line}, character {w.column}: "
+            f"{w.left!r} in {sides[0]}, {w.right!r} in {sides[1]})"
         )
     if type(a) is not type(b) or a != b:
         return f"{path or '(root)'} ({_short(a)} in {sides[0]}, {_short(b)} in {sides[1]})"
     return None
+
+
+@dataclass(frozen=True)
+class Window:
+    """Where two long strings first differ (1-based), and a stretch of each around it."""
+
+    line: int
+    column: int
+    left: str
+    right: str
+
+
+def long(a: str, b: str) -> bool:
+    """Whether either string is too long to show whole, so a difference shows a window into both."""
+    return max(len(repr(a)), len(repr(b))) > 80
+
+
+def window(a: str, b: str) -> Window:
+    i = next((i for i, (x, y) in enumerate(zip(a, b)) if x != y), min(len(a), len(b)))
+    around = slice(max(0, i - 20), i + 40)
+    return Window(a.count("\n", 0, i) + 1, i - (a.rfind("\n", 0, i) + 1) + 1, a[around], b[around])
 
 
 def describe(value: Any, limit: int = 80) -> str:

@@ -631,6 +631,19 @@ class Container:
         self._add("transformation", obj)
         return transformation_id
 
+    def gtag_config(self, type_: str, parameters: Sequence[dict[str, Any]]) -> str:
+        """Adds a Google tag configuration. UNVERIFIED: no export to hand has one; this is the API's shape."""
+        config_id, fingerprint = self._id()
+        obj = {
+            **self._stamp(),
+            "gtagConfigId": config_id,
+            "type": type_,
+            "parameter": list(parameters),
+            "fingerprint": fingerprint,
+        }
+        self._add("gtagConfig", obj)
+        return config_id
+
     def export(
         self,
         export_time: str,
@@ -663,7 +676,7 @@ class Container:
             f"https://tagmanager.google.com/#/versions/accounts/{account}/containers/{container}"
             f"/versions/{version_id}?apiLink=version"
         )
-        for collection in ("customTemplate", "client", "transformation"):
+        for collection in ("customTemplate", "client", "transformation", "gtagConfig"):
             if collection in self._objects:
                 version[collection] = _by_id(collection, self._objects[collection])
         # Through JSON, so no two objects share a dict (deepcopy would keep them shared).
@@ -726,6 +739,7 @@ ID_KEYS = {
     "customTemplate": "templateId",
     "client": "clientId",
     "transformation": "transformationId",
+    "gtagConfig": "gtagConfigId",
 }
 
 

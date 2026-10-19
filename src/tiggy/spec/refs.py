@@ -9,6 +9,7 @@ from difflib import get_close_matches
 from typing import Any
 
 from tiggy.gtm import builtins
+from tiggy.spec.overlay import Role
 from tiggy.spec.problems import Collector, Origin, describe
 from tiggy.spec.yamlio import Flow
 
@@ -73,6 +74,29 @@ def spellings(type_: str, templates: list[Template]) -> list[tuple[Template, str
     return found
 
 
+def spelled(value: Any, role: Role, form: bool = False) -> Any:
+    """A reference as canon tags it (`['trigger', name]`, `['template', name, form]`), as a spec writes it.
+
+    `form` keeps a template's form, which a spec only writes when it isn't the template's usual one.
+    """
+    match value:
+        case ["trigger" | "folder", name]:
+            return name
+        case ["built_in", trigger_id]:
+            return _built_in(trigger_id)
+        case ["dangling", raw]:
+            return Flow(folder_id=raw) if role is Role.FOLDER_REF else Flow(trigger_id=raw)
+        case ["template", name, form_]:
+            return Flow(template=name, form=form_) if form else Flow(template=name)
+    return value
+
+
+def _built_in(trigger_id: str) -> Flow:
+    if trigger_id in builtins.TRIGGER_NAMES:
+        return Flow(built_in=builtins.TRIGGER_NAMES[trigger_id])
+    return Flow(built_in_id=trigger_id)
+
+
 class ImportRefs:
     """Names for the IDs in an export-shaped ContainerVersion, and back again."""
 
@@ -86,9 +110,7 @@ class ImportRefs:
         if trigger_id in self.triggers:
             return self.triggers[trigger_id]
         if builtins.is_trigger_id(trigger_id):
-            if trigger_id in builtins.TRIGGER_NAMES:
-                return Flow(built_in=builtins.TRIGGER_NAMES[trigger_id])
-            return Flow(built_in_id=trigger_id)
+            return _built_in(trigger_id)
         return Flow(trigger_id=trigger_id)
 
     def trigger_id(self, ref: Any, origin: Origin) -> str:

@@ -12,6 +12,7 @@ proves the two land on the same container.
 import copy
 import json
 import re
+from collections import defaultdict
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,7 @@ from tests.conftest import (
     FIXTURES,
     edit_spec,
     fragment_of,
+    line_of,
     load_export,
     problems_reported,
     replace_in_spec,
@@ -289,20 +291,20 @@ def lands(spec: Path, expected: Path, strict: bool = True) -> None:
     assert (checked.code, checked.out) == (0, f"{spec} is equivalent to {expected}\n"), str(checked)
 
 
-def drift(spec: Path, export: Path) -> dict[tuple[str, str], str]:
-    """What `import --check` says differs between the export and the spec, by (kind, name)."""
+def drift(spec: Path, export: Path) -> dict[tuple[str, str], list[str]]:
+    """What `import --check` says differs between the export and the spec, by (kind, name), unlocated."""
     result = run_tiggy("import", export, spec, "--check")
     assert result.code == 1, str(result)
     *lines, summary = result.out.splitlines()
-    found = {}
+    found = defaultdict(list)
     for line in lines:
-        match = re.fullmatch(r"≠ (\w+) '(.+?)': (.+)", line)
+        match = re.fullmatch(r"≠ (\w+) '(.+?)': (.+?)(?:  \S+:\d+)?", line)
         assert match, f"unexpected --check line {line!r}\n{result}"
-        found[match[1], match[2]] = match[3]
+        found[match[1], match[2]].append(match[3])
     assert re.fullmatch(
-        rf"{len(found)} differences? between {re.escape(str(export))} and {re.escape(str(spec))}", summary
+        rf"{len(lines)} differences? between {re.escape(str(export))} and {re.escape(str(spec))}", summary
     )
-    return found
+    return dict(found)
 
 
 def findings(source: Path) -> tuple[int, list[dict[str, Any]], list[str]]:
@@ -324,13 +326,6 @@ def refused(spec: Path, *problems: str) -> None:
     assert exported.code == 1, str(exported)
     assert [f"✗ {p}" for p in problems] == exported.err.splitlines()[: len(problems)]
     assert not target.exists()
-
-
-def line_of(spec: Path, relpath: str, text: str) -> int:
-    """The 1-based line in a spec file holding `text`, which has to appear on exactly one line."""
-    lines = (spec / relpath).read_bytes().decode("utf-8").splitlines()
-    (number,) = [n for n, line in enumerate(lines, 1) if text in line]
-    return number
 
 
 # 1. Add a new property to an existing event.
@@ -390,9 +385,11 @@ def test_the_new_property_shows_in_the_payload_drift_at_its_line(imported):
     spec_add_payload_key(spec, "file_size")
 
     assert drift(spec, ANALYTICS) == {
-        ("variables", PAYLOAD): "parameter[0].value (from line 16, character 5: "
-        "'.environment}},\\n    item_brand:           {{DLV - event_attr' in the container, "
-        "'.environment}},\\n    file_size:            {{DLV - event_attr' in the spec)"
+        ("variables", PAYLOAD): [
+            "parameter.javascript (from line 16, character 5: "
+            "'.environment}},\\n    item_brand:           {{DLV - event_attr' in the container, "
+            "'.environment}},\\n    file_size:            {{DLV - event_attr' in the spec)"
+        ]
     }
 
 
@@ -426,8 +423,9 @@ def test_a_row_added_out_of_order_is_a_difference_from_gtm(imported, tmp_path: P
     )
 
     assert drift(spec, expected) == {
-        ("tags", "GA4 - file_download"): "parameter[2].list[2].map[0].value ('file_size' in the container, "
-        "'item_variant' in the spec)"
+        ("tags", "GA4 - file_download"): [
+            "parameter.eventSettingsTable[4] (at [2] in the container, [4] in the spec)"
+        ]
     }
 
 
@@ -524,13 +522,17 @@ def test_adding_a_brand_new_event_end_to_end(imported, tmp_path: Path):
 
     lands(spec, expected)
     differences = drift(spec, ANALYTICS)
-    assert differences.pop(("variables", PAYLOAD)).startswith("parameter[0].value (from line ")
+    (payload,) = differences.pop(("variables", PAYLOAD))
+    assert payload.startswith("parameter.javascript (from line ")
     assert differences == {
-        ("variables", dlv("video_percent")): "only in the spec",
-        ("variables", dlv("video_title")): "only in the spec",
-        ("triggers", "CE - track_event - video_progress"): "only in the spec",
-        ("tags", "GA4 - video_progress"): "only in the spec",
-        ("tags", AMPLITUDE): "parameter[1].list (25 items in the container, 27 in the spec)",
+        ("variables", dlv("video_percent")): ["only in the spec"],
+        ("variables", dlv("video_title")): ["only in the spec"],
+        ("triggers", "CE - track_event - video_progress"): ["only in the spec"],
+        ("tags", "GA4 - video_progress"): ["only in the spec"],
+        ("tags", AMPLITUDE): [
+            f"parameter.eventProperties[{i}] ({json.dumps(amplitude_row(prop))} only in the spec)"
+            for i, prop in enumerate(VIDEO_PROPERTIES, 24)
+        ],
     }
 
 
@@ -628,7 +630,10 @@ def test_putting_a_marketing_tag_behind_ad_storage_consent(imported, tmp_path: P
 
     lands(spec, changed(MARKETING, ad_storage_consent, tmp_path / "expected.json"))
     assert drift(spec, MARKETING) == {
-        ("tags", tag): "consentSettings.consentStatus ('NOT_SET' in the container, 'NEEDED' in the spec)"
+        ("tags", tag): [
+            "consent_settings.consent_status ('NOT_SET' in the container, 'NEEDED' in the spec)",
+            "consent_settings.consent_type (missing from the container)",
+        ]
     }
 
 
@@ -728,12 +733,11 @@ def test_renaming_a_trigger_follows_every_tag_that_fires_on_it(imported, tmp_pat
         ),
     )
     assert drift(spec, ANALYTICS) == {
-        ("triggers", "CE - sign_up"): "only in the container",
-        ("triggers", "CE - sign_up (all)"): "only in the spec",
-        (
-            "tags",
-            "GA4 - sign_up",
-        ): "firingTriggerId[0][1] ('CE - sign_up' in the container, 'CE - sign_up (all)' in the spec)",
+        ("triggers", "CE - sign_up"): ["only in the container"],
+        ("triggers", "CE - sign_up (all)"): ["only in the spec"],
+        ("tags", "GA4 - sign_up"): [
+            "firing_triggers ('CE - sign_up' in the container, 'CE - sign_up (all)' in the spec)"
+        ],
     }
 
 
@@ -876,13 +880,13 @@ def _files(directory: Path) -> dict[str, bytes]:
         (
             ("    folder: Data Layer\n", "    folder: GA4\n"),
             "GA4",
-            "parentFolderId[1] ('Data Layer' in the container, 'GA4' in the spec)",
+            "folder ('Data Layer' in the container, 'GA4' in the spec)",
             "folders/ga4/variables.yml",
         ),
         (
             ("    folder: Data Layer\n", ""),
             None,
-            "parentFolderId (missing from the spec)",
+            "folder (missing from the spec)",
             "unfiled/variables.yml",
         ),
     ],
@@ -903,7 +907,7 @@ def test_changing_the_folder_field_changes_only_folder_membership(
             variable["parentFolderId"] = _named(version["folder"], folder_id)["folderId"]
 
     lands(spec, changed(ANALYTICS, refolder, tmp_path / "expected.json"))
-    assert drift(spec, ANALYTICS) == {("variables", name): difference}
+    assert drift(spec, ANALYTICS) == {("variables", name): [difference]}
     exported, again = tmp_path / "exported.json", tmp_path / "again"
     assert run_tiggy("export", spec, "-o", exported).code == 0
     assert run_tiggy("import", exported, again).code == 0
@@ -1000,8 +1004,8 @@ def block_page_view_anon(spec: Path, trigger: str = "Event - page_view_anon") ->
 def test_keeping_page_view_anon_away_from_ga4(imported, tmp_path: Path):
     spec = imported(unblocked_server(tmp_path / "before.json"))
     assert drift(spec, SERVER) == {
-        ("tags", "GA4"): "blockingTriggerId (missing from the spec)",
-        ("triggers", "Event - page_view_anon"): "only in the container",
+        ("tags", "GA4"): ["blocking_triggers (missing from the spec)"],
+        ("triggers", "Event - page_view_anon"): ["only in the container"],
     }
 
     block_page_view_anon(spec)
@@ -1048,7 +1052,7 @@ def test_deleting_a_tag_removes_it_and_nothing_else(imported, tmp_path: Path):
         changed(ANALYTICS, without_tag("GA4 - view_search_results"), tmp_path / "expected.json"),
         strict=False,
     )
-    assert drift(spec, ANALYTICS) == {("tags", "GA4 - view_search_results"): "only in the container"}
+    assert drift(spec, ANALYTICS) == {("tags", "GA4 - view_search_results"): ["only in the container"]}
     code, found, files = findings(spec)
     assert (code, files) == (0, [])
     assert [(f["rule"], f["kind"], f["name"]) for f in found] == [
@@ -1062,7 +1066,7 @@ def test_deleting_a_custom_html_tag_takes_its_code_file_with_it(imported, tmp_pa
 
     assert code == ["folders/microsoft-advertising/microsoft-ads-uet-purchase.html"]
     lands(spec, changed(MARKETING, without_tag("Microsoft Ads - UET purchase"), tmp_path / "expected.json"))
-    assert drift(spec, MARKETING) == {("tags", "Microsoft Ads - UET purchase"): "only in the container"}
+    assert drift(spec, MARKETING) == {("tags", "Microsoft Ads - UET purchase"): ["only in the container"]}
 
 
 def test_a_deleted_tags_code_file_left_behind_is_flagged(imported):

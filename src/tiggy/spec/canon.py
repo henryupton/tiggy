@@ -1,13 +1,14 @@
 """Container equivalence: equal unless something other than GTM-assigned identity differs.
 
 `canon` drops identity, bookkeeping and read-only state, rewrites every ID reference to what it refers
-to, and keys each collection by name. Two containers are equivalent exactly when their canons are equal.
-Collections are the only unordered part, because GTM orders them by the IDs this deliberately ignores.
+to, and keys each collection by name. Collections are its only unordered part, because GTM orders them by
+the IDs this deliberately ignores. Equal canons are exactly the same container, which an import proves;
+`semantic` also drops what GTM's schema says means nothing, which is what a drift check compares.
 """
 
 import json
 from collections import Counter
-from typing import Any
+from typing import Any, get_origin
 
 from tiggy.gtm import builtins
 from tiggy.gtm.base import GtmModel
@@ -87,6 +88,62 @@ def compare(
     a: dict[str, Any], b: dict[str, Any], sides: tuple[str, str] = ("the left", "the right")
 ) -> str | None:
     return difference(canon(a), canon(b), sides=sides)
+
+
+def semantic(exact: Any, model: type[GtmModel]) -> Any:
+    """σ: canon's form of a `model`, coarsened only where GTM's schema says order or emptiness means nothing.
+
+    Parameters with distinct keys become a mapping by key ("uniquely identifies a parameter"), trigger sets
+    are sorted ("any of"), and an empty repeated field is absent, as proto3 writes it. A function of canon,
+    so whatever canon calls equal stays equal.
+    """
+    if not isinstance(exact, dict):
+        return exact
+    roles = {f.alias: f for f in fields(model)}
+    out: dict[str, Any] = {}
+    for key, value in exact.items():
+        f = roles.get(key)
+        if f is None:  # unmodelled, so even an empty list may mean something
+            out[key] = value
+            continue
+        match f.role:
+            case Role.NESTED:
+                value = semantic(value, f.model)
+            case Role.TRIGGER_REFS if isinstance(value, list):
+                value = sorted(value, key=_json)
+            case Role.PARAMETER:
+                value = _parameter(value)
+            case Role.PARAMETER_LIST if isinstance(value, list):
+                value = _keyed(value)
+            case Role.NESTED_LIST if isinstance(value, list):
+                value = [semantic(v, f.model) for v in value]
+        if get_origin(f.annotation) is list and isinstance(value, list | dict) and not value:
+            continue  # a repeated field has no presence, whether a list or parameters keyed by σ
+        out[key] = value
+    return out
+
+
+def _parameter(p: Any) -> Any:
+    if not isinstance(p, dict):
+        return p
+    out = {k: v for k, v in p.items() if not (k in ("list", "map") and v == [])}
+    if isinstance(out.get("list"), list):
+        out["list"] = [_parameter(item) for item in out["list"]]
+    if isinstance(out.get("map"), list):
+        out["map"] = _keyed(out["map"])
+    return out
+
+
+def _keyed(params: list[Any]) -> Any:
+    """Parameters by GTM key when every key is a distinct string, so a set; otherwise in order."""
+    keys = [p.get("key") if isinstance(p, dict) else None for p in params]
+    if all(isinstance(k, str) for k in keys) and len(set(keys)) == len(keys):
+        return {p["key"]: _parameter({k: v for k, v in p.items() if k != "key"}) for p in params}
+    return [_parameter(p) for p in params]
+
+
+def _json(value: Any) -> str:
+    return json.dumps(value, sort_keys=True)
 
 
 class _Canon:

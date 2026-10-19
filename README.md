@@ -85,16 +85,42 @@ are refused: a Windows checkout turns them into text files.
 
 ```bash
 tiggy import container.json spec/
-tiggy import container.json spec/ --check
+tiggy import live.json spec/ --check
+tiggy import live.json spec/ --check --format github
 ```
 
 Writes the spec into a new or empty directory. Before anything lands, the written spec is reloaded, compiled and
 compared with the export file as written, so only GTM-assigned IDs and bookkeeping may differ. An export Tiggy
 can't reproduce exactly (a value it would read differently, two objects with one name) is refused, not
-approximated. `--check` writes nothing and lists what differs between the export and an existing spec, which makes
-it a drift gate for CI. It refuses an export of another container than the spec's `public_id`, so a staging copy
-can't pass for production. Exports from the Tag Manager API, which spells enums `customEvent` rather than
-`CUSTOM_EVENT`, read the same as the UI's.
+approximated.
+
+`--check` writes nothing and lists every difference between the export and an existing spec, which makes it a
+drift gate for CI. Each names the field as the spec spells it and the line to edit, relative to the working
+directory when the spec is inside it. A change to a code file is at the line in that file where it starts, and
+a long file shows a window into it there:
+
+```
+≠ tags 'GA4 - sign_up': paused (missing from the spec)  gtm/web/folders/ga4/tags.yml:45
+≠ tags 'GA4 - sign_up': parameter.eventName ('signup' in the container, 'sign_up' in the spec)  gtm/web/folders/ga4/tags.yml:62
+2 differences between live.json and gtm/web
+```
+
+`--format json` gives each difference with its path, the values its message shows and its location;
+`--format github` writes workflow commands, so in GitHub Actions each shows on the pull request's diff.
+
+Only differences in meaning count. A tag's parameters in another order (each key is unique), its triggers in
+another order (any of them fires it) and an empty list against none are the same container; table rows and filter
+conditions keep their order. Objects that match only once those are ignored are counted in a note on stderr, and
+`--exact` counts them as differences.
+
+Some fields GTM may fill in when a spec leaves them out: `format_value: {}` and a Data Layer variable's
+`setDefaultValue: false`, a tag's `monitoring_metadata` and its `NOT_SET` consent status. Tiggy can't confirm that
+yet, so these still count as differences, labelled `GTM's default, unverified`, and as warnings in
+`--format github`.
+
+It refuses an export of another container than the spec's `public_id`, so a staging copy can't pass for
+production. Exports from the Tag Manager API, which spells enums `customEvent` rather than `CUSTOM_EVENT`, read the
+same as the UI's.
 
 Exits 0 when written or equivalent, 1 when `--check` finds differences, 2 when it can't run.
 

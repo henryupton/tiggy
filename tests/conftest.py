@@ -6,7 +6,8 @@ Exports to test against, as lists of paths (parametrize with `ids=export_id`):
     EXTRA_EXPORTS        real exports from $TIGGY_EXTRA_EXPORTS, a directory outside the repo
     ALL_EXPORTS          all of the above
 
-Helpers: run_tiggy, base_env, scrub, load_export, write_export, edit_spec, replace_in_spec, fragment_of.
+Helpers: run_tiggy, base_env, scrub, load_export, write_export, edit_spec, replace_in_spec, fragment_of,
+line_of.
 Fixtures: tiggy (run_tiggy), imported, golden (with --update-goldens).
 """
 
@@ -351,6 +352,13 @@ def fragment_of(spec_dir: Path, kind: str, name: str) -> Path:
             found.append(path)
     assert len(found) == 1, f"{kind} {name!r} is defined in {len(found)} fragments: {found}"
     return found[0]
+
+
+def line_of(spec: Path, relpath: str, text: str) -> int:
+    """The 1-based line in a spec file holding `text`, which has to appear on exactly one line."""
+    lines = (spec / relpath).read_bytes().decode("utf-8").splitlines()
+    (number,) = [n for n, line in enumerate(lines, 1) if text in line]
+    return number
 
 
 # Goldens

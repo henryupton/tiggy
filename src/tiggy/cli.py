@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import traceback
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,7 @@ from tiggy.spec.problems import Origin, Problem, SpecError
 
 CLOSED_STDOUT = "stdout is closed, so there's nowhere to write"
 FORMATS = {"text": report.text, "json": report.as_json, "github": report.github}
+DRIFT_FORMATS = {"text": report.drift_text, "json": report.drift_json, "github": report.drift_github}
 SPEC_KEYS = {
     Kind.TAG: "tags",
     Kind.TRIGGER: "triggers",
@@ -207,20 +209,40 @@ TARGETS = click.option(
 @click.option(
     "--resolve-secrets", is_flag=True, help="With --check, fetch secrets and compare their values too."
 )
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(sorted(DRIFT_FORMATS)),
+    help="With --check (default text); github writes workflow commands, so differences show on a diff.",
+)
+@click.option(
+    "--exact",
+    is_flag=True,
+    help="With --check, count objects that match only once order and empty lists are ignored.",
+)
 @TARGETS
 @exits_2_on_crash
 def import_(
-    source: Path, spec_dir: Path, check_only: bool, resolve_secrets: bool, targets: Path | None
+    source: Path,
+    spec_dir: Path,
+    check_only: bool,
+    resolve_secrets: bool,
+    fmt: str | None,
+    exact: bool,
+    targets: Path | None,
 ) -> None:
     """Write a container export out as a YAML spec in SPEC_DIR.
 
     The spec is proven to compile back to the same container before it is written, and secrets
     (access tokens, API secrets) are written as {$secret: name} references, never their values.
-    With --check, nothing is written: SOURCE is compared with the spec already in SPEC_DIR, and
-    secret values only with --resolve-secrets.
+    With --check, nothing is written: SOURCE is compared with the spec already in SPEC_DIR, every
+    difference listed at the spec's file and line, and secret values only with --resolve-secrets.
     """
     if resolve_secrets and not (check_only and targets):
         raise InputError("--resolve-secrets is for --check, with --targets naming the secret store")
+    for given, flag in ((fmt, "--format"), (exact, "--exact")):
+        if given and not check_only:
+            raise InputError(f"{flag} is for --check")
     if sys.stdout is None and not check_only:  # refused before anything is written, not after
         raise InputError(CLOSED_STDOUT)
     read = _read_export(source)
@@ -237,25 +259,31 @@ def import_(
         _require_spec(spec_dir)
         fetching = Fetching(_store(targets)) if resolve_secrets and targets else None
         try:
-            comparison = check(read.raw_version, spec_dir, fetching)
+            comparison = check(read.raw_version, spec_dir, fetching, exact)
         except SpecError as e:
             raise InputError(f"the spec in {spec_dir} doesn't load:\n{_problems(e, spec_dir)}") from e
         except ImportError_ as e:
             raise InputError(str(e)) from e
         if fetching and fetching.failures:
             raise InputError("can't read the spec's secrets:\n" + "\n".join(fetching.failures))
-        _print_warnings(comparison.warnings)
-        if comparison.unread_secrets:
-            unread = plural(comparison.unread_secrets, "secret value")
+        prefix = _prefix(spec_dir)
+        warnings = _relocated(comparison.warnings, prefix)
+        _print_warnings(warnings)
+        diff = comparison.diff
+        if diff.unread_secrets:
+            unread = plural(diff.unread_secrets, "secret value")
             _err(f"note: {unread} not compared (--resolve-secrets to compare them)")
-        differences = comparison.differences
-        if differences:
-            for line in differences:
-                _out(f"{click.style('≠', fg='yellow')} {printable(line)}")
-            summary = f"{plural(len(differences), 'difference')} between {source} and {spec_dir}"
-            _out(click.style(printable(summary), fg="yellow"))
+        if diff.semantic_only and not exact:
+            n = diff.semantic_only
+            match, them = ("matches", "it") if n == 1 else ("match", "them")
+            _err(
+                f"note: {plural(n, 'object')} {match} only once order and empty lists are ignored "
+                f"(--exact counts {them})"
+            )
+        located = replace(diff, changes=[replace(c, origin=_within(c.origin, prefix)) for c in diff.changes])
+        _out(DRIFT_FORMATS[fmt or "text"](located, str(source), str(spec_dir), [str(w) for w in warnings]))
+        if diff.changes:
             raise SystemExit(1)
-        _out(click.style(printable(f"{spec_dir} is equivalent to {source}"), fg="green"))
         return
     try:
         result = import_version(read.raw_version, spec_dir)
@@ -398,10 +426,11 @@ def _prefix(spec_dir: Path) -> str:
 
 
 def _relocated(problems: list[Problem], prefix: str) -> list[Problem]:
-    return [
-        Problem(Origin(prefix + p.origin.file, p.origin.line) if p.origin else None, p.message)
-        for p in problems
-    ]
+    return [Problem(_within(p.origin, prefix), p.message) for p in problems]
+
+
+def _within(origin: Origin | None, prefix: str) -> Origin | None:
+    return Origin(prefix + origin.file, origin.line) if origin else None
 
 
 def _require_spec(spec_dir: Path) -> None:

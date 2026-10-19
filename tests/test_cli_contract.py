@@ -390,7 +390,8 @@ def test_check_exits_1_and_names_what_drifted(tmp_path: Path, imported):
     result = run_tiggy("import", live, spec, "--check")
     assert result.code == 1, str(result)
     assert scrub(result.out, live, spec) == (
-        "≠ tags 'GA4 - sign_up': paused (missing from the spec)\n1 difference between <path1> and <path2>\n"
+        "≠ tags 'GA4 - sign_up': paused (missing from the spec)  folders/ga4/tags.yml:45\n"
+        "1 difference between <path1> and <path2>\n"
     )
     assert _snapshot(spec) == before, "--check writes nothing"
 
@@ -787,3 +788,22 @@ def test_no_color_turns_colour_off_on_a_terminal():
     code, out = _on_a_terminal("validate", LEGACY, env={"NO_COLOR": "1"})
     assert code == 1
     assert b"\x1b[" not in out, out[:200]
+
+
+@POSIX
+@pytest.mark.parametrize("no_color", [None, "1"], ids=["colour", "NO_COLOR"])
+def test_check_marks_drift_and_dims_its_line_on_a_terminal_unless_no_color(no_color, tmp_path, imported):
+    spec = imported(ANALYTICS)
+    live = _variant(tmp_path, "live.json", _paused_in_the_ui)
+
+    code, out = _on_a_terminal("import", live, spec, "--check", env={"NO_COLOR": no_color})
+
+    assert code == 1
+    if no_color:
+        assert b"\x1b[" not in out, out[:200]
+        assert (
+            "≠ tags 'GA4 - sign_up': paused (missing from the spec)  folders/ga4/tags.yml:45".encode() in out
+        )
+    else:
+        assert "\x1b[33m≠\x1b[0m tags 'GA4 - sign_up': paused".encode() in out, out[:200]
+        assert "(missing from the spec)  \x1b[2mfolders/ga4/tags.yml:45\x1b[0m".encode() in out, out[:200]

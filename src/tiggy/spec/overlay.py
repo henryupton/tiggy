@@ -213,6 +213,16 @@ KEY_ORDER: dict[type[GtmModel], list[str]] = {
 SPEC_ONLY_KEYS = {r.GtagConfig: {"label"}}
 UNMODELLED = "unmodelled"
 
+# What GTM may fill in for a field a spec leaves out: (model, the object's type or None for any, spec path)
+# -> GTM's value. Unverified while the API is read-only to us, so a difference one explains is still drift,
+# only labelled as GTM's default.
+DEFAULTS: dict[tuple[type[GtmModel], str | None, tuple[str, ...]], Any] = {
+    (r.Variable, None, ("format_value",)): {},
+    (r.Tag, None, ("monitoring_metadata",)): {"type": "MAP"},
+    (r.Tag, None, ("consent_settings",)): {"consentStatus": "NOT_SET"},
+    (r.Variable, "v", ("parameter", "setDefaultValue")): {"type": "BOOLEAN", "value": "false"},
+}
+
 
 def snake(name: str) -> str:
     return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()

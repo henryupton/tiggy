@@ -16,21 +16,19 @@ from tiggy.secrets import NAME, Resolve, SecretRef
 from tiggy.spec.problems import Collector, Origin, at, at_item, describe, difference, same
 from tiggy.spec.yamlio import Flow, Map, is_canonical_int
 
-FIELDS = {"type", "key", "value", "list", "map", "isWeakReference"}
-TYPES = {t.export_value for t in ParameterType}
-EXPLICIT_KEYS = {
-    "$type",
-    "$key",
-    "$value",
-    "$file",
-    "$trigger",
-    "$list",
-    "$map",
-    "$is_weak_reference",
-    "$unmodelled",
+EXPLICIT = {  # a Parameter's fields, as the explicit form spells them
+    "type": "$type",
+    "key": "$key",
+    "value": "$value",
+    "list": "$list",
+    "map": "$map",
+    "isWeakReference": "$is_weak_reference",
 }
+FIELDS = set(EXPLICIT)
+TYPES = {t.export_value for t in ParameterType}
+EXPLICIT_KEYS = {*EXPLICIT.values(), "$file", "$trigger", "$unmodelled"}
 SECRET_KEYS = {"$secret", "version"}
-_NO_SHORTHAND = object()
+NO_SHORTHAND = object()
 
 
 class Unwritable(ValueError):
@@ -134,8 +132,8 @@ class Codec:
         try:
             candidate = Flow({"$secret": secret}) if secret else self._shorthand(p, keyed)
         except ValueError:
-            candidate = _NO_SHORTHAND
-        if candidate is not _NO_SHORTHAND:
+            candidate = NO_SHORTHAND
+        if candidate is not NO_SHORTHAND:
             try:
                 if same(self.decode(candidate, key), p):
                     return candidate
@@ -159,19 +157,15 @@ class Codec:
 
     def _shorthand(self, p: dict[str, Any], keyed: bool) -> Any:
         if not keyed and "key" in p:
-            return _NO_SHORTHAND
-        kind, value = p.get("type"), p.get("value")
-        if kind == "TEMPLATE" and "list" not in p and "map" not in p:
-            return value if "value" in p else None
-        if kind == "BOOLEAN" and value in ("true", "false"):
-            return value == "true"
-        if kind == "INTEGER" and isinstance(value, str) and is_canonical_int(value):
-            return int(value)
+            return NO_SHORTHAND
+        if (found := scalar(p)) is not NO_SHORTHAND:
+            return found
+        kind = p.get("type")
         if kind == "LIST" and isinstance(p.get("list"), list) and "value" not in p:
             return self._items(p["list"])
         if kind == "MAP" and isinstance(p.get("map"), list) and "value" not in p and _usable_keys(p["map"]):
             return Map((c["key"], self._keyed(c)) for c in p["map"])
-        return _NO_SHORTHAND
+        return NO_SHORTHAND
 
     def _explicit(self, p: dict[str, Any], keyed: bool) -> dict[str, Any]:
         node: dict[str, Any] = {"$type": p.get("type")}
@@ -365,6 +359,22 @@ class Codec:
         if self.problems is None:  # encoding checks a node built in memory, so there's no file to name
             raise ValueError(message)
         self.problems.add(origin, message)
+
+
+def scalar(p: dict[str, Any]) -> Any:
+    """The YAML scalar a TEMPLATE, BOOLEAN or INTEGER parameter reads as, or NO_SHORTHAND.
+
+    Whether a key or a field other than a list or map rules shorthand out is the caller's. A TEMPLATE with
+    no value and one with a null value both read as None.
+    """
+    kind, value = p.get("type"), p.get("value")
+    if kind == "TEMPLATE" and "list" not in p and "map" not in p:
+        return value if "value" in p else None
+    if kind == "BOOLEAN" and value in ("true", "false"):
+        return value == "true"
+    if kind == "INTEGER" and isinstance(value, str) and is_canonical_int(value):
+        return int(value)
+    return NO_SHORTHAND
 
 
 def _usable_keys(params: list[Any]) -> bool:

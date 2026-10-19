@@ -1267,8 +1267,8 @@ def test_check_shows_a_window_into_a_long_value_not_the_whole_value(tmp_path: Pa
 
     assert result.code == 1, result
     difference = result.out.splitlines()[0]
-    assert difference.startswith("≠ tags 'HTML - big': parameter[0].value (from line 202, character 39: ")
-    assert len(difference) < 250
+    assert difference.startswith("≠ tags 'HTML - big': parameter.html (from line 202, character 39: ")
+    assert difference.endswith("  unfiled/html-big.html:202") and len(difference) < 300
 
 
 def test_github_annotations_escape_what_workflow_commands_reserve():
