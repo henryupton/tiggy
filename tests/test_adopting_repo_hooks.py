@@ -8,6 +8,7 @@ their real entry points; checkouts go through a real git with an isolated config
 import ast
 import os
 import re
+import shlex
 import subprocess
 import sys
 from collections.abc import Callable, Iterator
@@ -22,6 +23,7 @@ from tests.conftest import (
     ALL_EXPORTS,
     CDM_EXPORTS,
     FIXTURES,
+    ROOT,
     THIRD_PARTY_EXPORTS,
     Result,
     export_id,
@@ -574,3 +576,17 @@ def _glob(glob: str) -> re.Pattern[str]:
             out.append(re.escape(c))
         i += 1
     return re.compile(anywhere + "".join(out))
+
+
+def test_the_shipped_pre_commit_hook_validates_the_spec_it_is_given(imported: Callable[..., Path]):
+    """An adopting repo adds the hook with its spec directory in `args`; pre-commit appends no file names."""
+    (hook,) = yaml.safe_load((ROOT / ".pre-commit-hooks.yaml").read_text(encoding="utf-8"))
+    assert (hook["id"], hook["language"]) == ("tiggy-validate", "python")
+    assert hook["pass_filenames"] is False, "validate takes one spec directory, not the changed files"
+    program, *command = shlex.split(hook["entry"])
+    assert program == "tiggy"
+    spec = imported(ANALYTICS)
+    assert run_tiggy(*command, spec).code == 0
+    tags = next(spec.glob("folders/*/tags.yml"))
+    tags.write_bytes(tags.read_bytes().replace(b"    type:", b"    typ:", 1))
+    assert run_tiggy(*command, spec).code == 1

@@ -1,6 +1,5 @@
 import functools
 import io
-import json
 import os
 import re
 import signal
@@ -19,12 +18,13 @@ from tiggy.graph import ContainerGraph, Kind, Node
 from tiggy.gtm.resources import BuiltInVariable
 from tiggy.io import export
 from tiggy.report import plural, printable
-from tiggy.spec.compiler import Compiled, compile_spec
+from tiggy.spec.compiler import Compiled, check_spec, compile_spec
 from tiggy.spec.importer import ImportError_, check, import_version, umask
 from tiggy.spec.loader import load_spec, looks_like_spec
-from tiggy.spec.problems import Problem, SpecError
+from tiggy.spec.problems import Origin, Problem, SpecError
 
 CLOSED_STDOUT = "stdout is closed, so there's nowhere to write"
+FORMATS = {"text": report.text, "json": report.as_json, "github": report.github}
 SPEC_KEYS = {
     Kind.TAG: "tags",
     Kind.TRIGGER: "triggers",
@@ -134,39 +134,56 @@ def cli(ctx: click.Context) -> None:
 
 @cli.command()
 @click.argument("source", type=click.Path(exists=True, path_type=Path))
-@click.option("--format", "fmt", type=click.Choice(["text", "json"]), default="text", show_default=True)
+@click.option(
+    "--format",
+    "fmt",
+    type=click.Choice(sorted(FORMATS)),
+    default="text",
+    show_default=True,
+    help="github writes workflow commands, so findings show on a pull request's diff.",
+)
 @click.option("--strict", is_flag=True, help="Fail on warnings as well as errors.")
 @exits_2_on_crash
 def validate(source: Path, fmt: str, strict: bool) -> None:
     """Check that everything in a container refers to something that exists.
 
-    SOURCE is a spec directory, or a container export (Admin > Export Container). Exits 0 when
-    valid, 1 when not (a spec file it can't read included), 2 when SOURCE isn't a spec or export.
+    SOURCE is a spec directory, or a container export (Admin > Export Container). A spec's problems
+    are reported with the errors the rest of it has (its warnings once it has no problems), at paths
+    relative to the working directory when the spec is inside it. Exits 0 when valid, 1 when not, 2
+    when SOURCE isn't a spec or export.
     """
+    graph: ContainerGraph | None = None
+    findings: list[checks.Finding] = []
     locations: dict[Node, str] = {}
     files: list[str] = []
+    problems: list[Problem] = []
     if source.is_dir():
-        compiled = _compile(source, fmt)
-        files = [str(w) for w in compiled.warnings]
-        labels = {(Kind.GTAG_CONFIG, i): label for i, label in compiled.labels.items()}
-        unversioned = compiled.version.model_copy(update={"container_version_id": None})  # a spec has none
-        graph = ContainerGraph(unversioned, labels)
-        locations = _locations(graph, compiled)
+        _require_spec(source)
+        prefix = _prefix(source)
+        checked = check_spec(load_spec(source))
+        problems = _relocated(checked.problems, prefix)
+        files = [str(w) for w in _relocated(checked.warnings, prefix)]
+        if checked.compiled is not None:
+            compiled = checked.compiled
+            labels = {(Kind.GTAG_CONFIG, i): label for i, label in compiled.labels.items()}
+            unversioned = compiled.version.model_copy(
+                update={"container_version_id": None}
+            )  # a spec has none
+            graph = ContainerGraph(unversioned, labels)
+            locations = _locations(graph, compiled, prefix)
     else:
         read = _read_export(source)
         misread = read.misread()
         if misread:
             raise InputError(f"{source}: Tiggy reads a value differently from how it's written, at {misread}")
         graph = ContainerGraph(read.export.container_version)
-    findings = checks.run(graph)
-    output = (
-        report.as_json(graph, findings, locations, files)
-        if fmt == "json"
-        else report.text(graph, findings, locations, files)
-    )
-    _out(output)
+    if graph is not None:
+        findings = checks.run(graph)
+    if problems:  # warnings wait for a spec that compiles: unused or never-fires may only echo a problem
+        findings = [f for f in findings if f.severity is Severity.ERROR]
+    _out(FORMATS[fmt](graph, findings, locations, files, problems))
     failing = {Severity.ERROR, Severity.WARNING} if strict else {Severity.ERROR}
-    if any(f.severity in failing for f in findings) or (strict and files):
+    if problems or any(f.severity in failing for f in findings) or (strict and files):
         raise SystemExit(1)
 
 
@@ -198,7 +215,7 @@ def import_(source: Path, spec_dir: Path, check_only: bool) -> None:
         try:
             comparison = check(read.raw_version, spec_dir)
         except SpecError as e:
-            raise InputError(f"the spec in {spec_dir} doesn't load:\n{_problems(e)}") from e
+            raise InputError(f"the spec in {spec_dir} doesn't load:\n{_problems(e, spec_dir)}") from e
         except ImportError_ as e:
             raise InputError(str(e)) from e
         _print_warnings(comparison.warnings)
@@ -239,7 +256,7 @@ def import_(source: Path, spec_dir: Path, check_only: bool) -> None:
 @exits_2_on_crash
 def export_(spec_dir: Path, output: str | None) -> None:
     """Compile a spec to a container export, the JSON GTM's Import Container reads."""
-    compiled = _compile(spec_dir, "text", err=True)
+    compiled = _compile(spec_dir)
     stamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
     text = export.dumps(
         export.ContainerExport(exportFormatVersion=2, exportTime=stamp, containerVersion=compiled.version)
@@ -284,18 +301,36 @@ def _device(path: Path) -> bool:
     return path.exists() and not path.is_file()
 
 
-def _problems(error: SpecError) -> str:
-    return "\n".join(printable(str(p)) for p in error.problems)
+def _problems(error: SpecError, spec_dir: Path) -> str:
+    return "\n".join(printable(str(p)) for p in _relocated(error.problems, _prefix(spec_dir)))
 
 
-def _compile(spec_dir: Path, fmt: str, err: bool = False) -> Compiled:
-    """A spec compiled, or its problems printed and exit 1 (exit 2 when it isn't a spec at all)."""
+def _compile(spec_dir: Path) -> Compiled:
+    """A spec compiled, or its problems on stderr and exit 1 (exit 2 when it isn't a spec at all)."""
     _require_spec(spec_dir)
     try:
         return compile_spec(load_spec(spec_dir))
     except SpecError as e:
-        _print_problems(e, fmt, err)
+        for problem in _relocated(e.problems, _prefix(spec_dir)):
+            _err(f"{click.style('✗', fg='red')} {printable(str(problem))}")
+        _err(click.style(f"{plural(len(e.problems), 'problem')} in the spec", fg="red"))
         raise SystemExit(1) from e
+
+
+def _prefix(spec_dir: Path) -> str:
+    """The spec's path from the working directory, so a location opens from wherever Tiggy ran."""
+    try:
+        relative = spec_dir.resolve().relative_to(Path.cwd().resolve())
+    except (OSError, ValueError):  # outside it, so locations stay relative to the spec
+        return ""
+    return "" if relative == Path() else f"{relative.as_posix()}/"
+
+
+def _relocated(problems: list[Problem], prefix: str) -> list[Problem]:
+    return [
+        Problem(Origin(prefix + p.origin.file, p.origin.line) if p.origin else None, p.message)
+        for p in problems
+    ]
 
 
 def _require_spec(spec_dir: Path) -> None:
@@ -314,7 +349,7 @@ def _read_export(source: Path) -> export.Source:
         raise InputError(str(e)) from e
 
 
-def _locations(graph: ContainerGraph, compiled: Compiled) -> dict[Node, str]:
+def _locations(graph: ContainerGraph, compiled: Compiled, prefix: str) -> dict[Node, str]:
     found = {}
     for node in graph.nodes:
         key = SPEC_KEYS.get(node.kind, "")
@@ -323,19 +358,8 @@ def _locations(graph: ContainerGraph, compiled: Compiled) -> dict[Node, str]:
             origin = compiled.origins.get((key, node.resource.type.export_value))
         origin = origin or compiled.origins.get((key, node.name))
         if origin:
-            found[node] = str(origin)
+            found[node] = prefix + str(origin)
     return found
-
-
-def _print_problems(error: SpecError, fmt: str, err: bool = False) -> None:
-    """Spec problems, on stdout as validate's report, or on stderr where stdout is the data."""
-    say = _err if err else _out
-    if fmt == "json":
-        say(json.dumps({"problems": [str(p) for p in error.problems]}, indent=2))
-        return
-    for problem in error.problems:
-        say(f"{click.style('✗', fg='red')} {printable(str(problem))}")
-    say(click.style(f"{plural(len(error.problems), 'problem')} in the spec", fg="red"))
 
 
 def _print_warnings(warnings: list[Problem]) -> None:

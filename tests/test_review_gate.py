@@ -63,8 +63,8 @@ def everywhere(spec: Path, line: str) -> list[str]:
 
 
 def problems(n: int) -> re.Pattern[str]:
-    """The summary line for `n` spec problems (its grammar is pinned by its own test)."""
-    return re.compile(rf"{n} problems? in the spec")
+    """The summary line for `n` spec problems and nothing else (its grammar is pinned by its own test)."""
+    return re.compile(rf"{n} errors?, 0 warnings")
 
 
 def matches(expected: str | re.Pattern[str], line: str) -> bool:
@@ -175,6 +175,7 @@ def rename_a_trigger_but_not_its_tags(spec: Path) -> Broken:
     return Broken(
         tuple(
             f'✗ {where}: trigger "CE - track_event - file_download" is not defined in this spec'
+            ' (did you mean "CE - track_event - download"?)'
             for where in firing
         ),
         problems(len(firing)),
@@ -372,6 +373,25 @@ def test_a_reviewer_reads_this_report_for_a_broken_dictionary_change(imported, g
 # What CI parses
 
 
+def test_github_format_annotates_each_problem_and_finding_at_its_line(imported):
+    """In a GitHub Actions job these show on the pull request's diff, at the line that broke."""
+    spec, (renamed, mistyped) = broken_spec(imported, rename_a_trigger_but_not_its_tags, mistype_a_ga4_row)
+    text, annotated = validate(spec), validate(spec, "--format", "github")
+    assert annotated.code == text.code == 1, annotated
+    *commands, tally = annotated.out.splitlines()
+    assert tally == text.out.splitlines()[-1]
+    assert all(re.fullmatch(r"::(error|warning) file=[^,]+,line=\d+,title=[a-z-]+::.+", c) for c in commands)
+
+    where, message = renamed.lines[0].removeprefix("✗ ").split(": ", 1)
+    file, line = where.rsplit(":", 1)
+    assert f"::error file={file},line={line},title=spec-problem::{message}" in commands
+    tag_at = mistyped.lines[0].rsplit("  ", 1)[1]
+    file, line = tag_at.rsplit(":", 1)
+    finding = mistyped.lines[1].strip().rsplit("  [", 1)[0]
+    expected = f'::error file={file},line={line},title=unknown-variable::tag "GA4 - file_download": {finding}'
+    assert expected in commands, annotated
+
+
 def report_lines(payload: dict) -> list[str]:
     """The finding lines of a text report, rebuilt from validate's JSON."""
     nodes: dict[tuple[str, str, str | None], list[dict]] = {}
@@ -397,14 +417,17 @@ def test_json_carries_the_same_findings_as_the_text_report(imported, breaker):
     assert data.code == text.code, f"{text}\n{data}"
     payload = json.loads(data.out)
     out = text.out.splitlines()
-    if "problems" in payload:
-        assert set(payload) == {"problems"}, payload
-        assert [f"✗ {p}" for p in payload["problems"]] == out[:-1], f"{text}\n{data}"
-        assert matches(broken.summary, out[-1]), text
-        return
-    assert payload["container"]["name"] == "Example - Analytics"
-    assert out[0].startswith("Example - Analytics (GTM-TEST001): "), text
-    assert report_lines(payload) == out[2:-2], f"{text}\n{data}"
+    spec_problems = [f for f in payload["findings"] if f["rule"] == "spec-problem"]
+    findings = [f for f in payload["findings"] if f["rule"] != "spec-problem"]
+    flagged = [f"✗ {p['location']}: {p['message']}" for p in spec_problems] + report_lines(
+        {"findings": findings}
+    )
+    if payload["container"]["name"] is None:  # nothing compiled, so no header
+        assert flagged == out[:-2], f"{text}\n{data}"
+    else:
+        assert payload["container"]["name"] == "Example - Analytics"
+        assert out[0].startswith("Example - Analytics (GTM-TEST001): "), text
+        assert flagged == out[2:-2], f"{text}\n{data}"
     summary = payload["summary"]
     assert out[-1] == f"{plural(summary['errors'], 'error')}, {plural(summary['warnings'], 'warning')}"
     assert matches(broken.summary, out[-1]), text
@@ -430,11 +453,6 @@ def test_strict_fails_ci_on_a_data_layer_variable_nothing_uses(imported):
 # Known gaps and bugs: written as the behaviour the gate should have
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="known gap: one spec problem (here a renamed trigger) stops validate before the reference "
-    "checks, so the reviewer fixes it and only then learns of the mistyped variable",
-)
 def test_one_run_reports_spec_problems_and_reference_findings_together(imported):
     spec, (renamed, mistyped) = broken_spec(imported, rename_a_trigger_but_not_its_tags, mistype_a_ga4_row)
     result = validate(spec)
@@ -470,10 +488,6 @@ TYPOS = {
 }
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="known gap: did-you-mean covers variables, tags and keys, not trigger, folder or template names",
-)
 @pytest.mark.parametrize("owner, kind, old, new, meant", TYPOS.values(), ids=TYPOS.keys())
 def test_a_mistyped_trigger_folder_or_template_name_suggests_the_real_one(
     imported, owner, kind, old, new, meant
@@ -488,11 +502,6 @@ def test_a_mistyped_trigger_folder_or_template_name_suggests_the_real_one(
     assert f'did you mean "{meant}"?' in flagged[0], result
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="known gap: locations are relative to the spec directory, so CI run from the adopting "
-    "repo's root prints paths that neither the diff nor an editor can open",
-)
 @pytest.mark.parametrize(
     "breaker", [mistype_a_ga4_row, rename_a_trigger_but_not_its_tags], ids=["finding", "spec-problem"]
 )
@@ -521,4 +530,4 @@ def test_a_single_spec_problem_is_counted_in_the_singular(imported):
     spec, _ = broken_spec(imported, rename_a_trigger_but_not_its_tags)
     result = validate(spec)
     assert result.code == 1, result
-    assert result.out.splitlines()[-1] == "1 problem in the spec", result
+    assert result.out.splitlines()[-1] == "1 error, 0 warnings", result

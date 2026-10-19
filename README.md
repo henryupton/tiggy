@@ -116,16 +116,36 @@ Import Container accepts it hasn't been tried yet.
 ```bash
 tiggy validate spec/
 tiggy validate examples/broken-container.json --format json --strict
+tiggy validate gtm/web-analytics --format github
 ```
 
 Takes a spec directory or a container export. Reports references that don't resolve (triggers,
 `{{variables}}`, setup and teardown tags, custom templates, folders), built-ins used but not enabled,
-duplicate names and IDs, variable and tag-sequencing loops, and unused triggers, variables and templates. For a
-spec, every finding points at its file and line, and a code file no `$file` names is a warning.
+duplicate names and IDs, variable and tag-sequencing loops, and unused triggers, variables and templates. A
+mistyped name gets a did-you-mean.
 
-Exits 0 when valid, 1 when not (`--strict` counts warnings; a spec file it can't read is a problem too), 2 when
-the input isn't a spec or an export, or is an export Tiggy would misread. `import --check` exits 2 on a spec that
-doesn't load, since 1 there means the two differ.
+For a spec, every finding points at its file and line, relative to the working directory when the spec is inside
+it, so a report from the repository root names paths an editor opens. A spec's problems (a name that doesn't
+resolve, a key Tiggy doesn't know) come in the same run as the errors in the rest of it; warnings follow once it
+has no problems, since an unused trigger may only be the other end of a misspelt one. A code file no `$file`
+names is a warning.
+
+`--format json` is one schema whether or not the spec compiles: a problem is a finding with rule `spec-problem`.
+`--format github` writes workflow commands, so in GitHub Actions each finding shows on the pull request's diff.
+
+Exits 0 when valid, 1 when not (`--strict` counts warnings), 2 when the input isn't a spec or an export, or is an
+export Tiggy would misread. `import --check` exits 2 on a spec that doesn't load, since 1 there means the two
+differ.
+
+As a [pre-commit](https://pre-commit.com) hook, with the spec directory as its argument:
+
+```yaml
+- repo: https://github.com/henryupton/tiggy
+  rev: v0.3.0
+  hooks:
+    - id: tiggy-validate
+      args: [gtm/web-analytics, --strict]
+```
 
 Every command exits 130 when interrupted and 141 when whatever reads its output stops early (`| head`). Output is
 coloured only on a terminal, and never when `NO_COLOR` is set.

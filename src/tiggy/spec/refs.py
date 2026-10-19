@@ -5,6 +5,7 @@ A spec never holds a GTM-assigned ID except where a reference dangles: `{trigger
 """
 
 from dataclasses import dataclass
+from difflib import get_close_matches
 from typing import Any
 
 from tiggy.gtm import builtins
@@ -12,6 +13,7 @@ from tiggy.spec.problems import Collector, Origin, describe
 from tiggy.spec.yamlio import Flow
 
 BUILT_IN_TRIGGER_IDS = {name: trigger_id for trigger_id, name in builtins.TRIGGER_NAMES.items()}
+UNRESOLVED = "\x00unresolved"  # what a reference that failed compiles to; no spec can spell it
 
 
 @dataclass(frozen=True)
@@ -132,7 +134,8 @@ class CompileRefs:
         if isinstance(ref, str):
             if ref in self.triggers:
                 return self.triggers[ref]
-            return self._fail(origin, f'trigger "{ref}" is not defined in this spec')
+            hint = _hint(ref, self.triggers)
+            return self._fail(origin, f'trigger "{ref}" is not defined in this spec{hint}')
         if isinstance(ref, dict) and len(ref) == 1:
             ((form, value),) = ref.items()
             if form == "built_in" and isinstance(value, str) and value in BUILT_IN_TRIGGER_IDS:
@@ -155,7 +158,8 @@ class CompileRefs:
         if isinstance(ref, str):
             if ref in self.folders:
                 return self.folders[ref]
-            return self._fail(origin, f'folder "{ref}" is not declared under folders')
+            hint = _hint(ref, self.folders)
+            return self._fail(origin, f'folder "{ref}" is not declared under folders{hint}')
         if isinstance(ref, dict) and set(ref) == {"folder_id"} and isinstance(ref["folder_id"], str):
             return ref["folder_id"]
         return self._fail(origin, f"{describe(ref)} is not a folder reference (a name or {{folder_id: ...}})")
@@ -170,7 +174,9 @@ class CompileRefs:
         ):
             template = self.templates.get(ref["template"])
             if template is None:
-                return self._fail(origin, f'custom template "{ref["template"]}" is not defined in this spec')
+                name = ref["template"]
+                hint = _hint(name, self.templates)
+                return self._fail(origin, f'custom template "{name}" is not defined in this spec{hint}')
             form = ref.get("form", template.expected_form)
             if form == "gallery" and template.gallery_type:
                 twins = sorted(
@@ -192,4 +198,9 @@ class CompileRefs:
 
     def _fail(self, origin: Origin, message: str) -> str:
         self.problems.add(origin, message)
-        return "0"
+        return UNRESOLVED
+
+
+def _hint(name: str, names: Any) -> str:
+    match = get_close_matches(name, list(names), n=1, cutoff=0.6)
+    return f' (did you mean "{match[0]}"?)' if match else ""

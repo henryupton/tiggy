@@ -193,6 +193,15 @@ def _text(raw: bytes) -> str:
     return raw.decode("utf-8", errors="replace").replace(os.linesep, "\n")
 
 
+FINDING_LINE = re.compile(r'[✗⚠] [a-z][a-z -]* "')
+
+
+def problems_reported(result: Result) -> list[str]:
+    """validate's spec problems, then its tally: its report without the header or any findings."""
+    lines = result.out.splitlines()
+    return [line for line in lines if line.startswith("✗ ") and not FINDING_LINE.match(line)] + lines[-1:]
+
+
 def scrub(text: str, *paths: str | os.PathLike) -> str:
     """`text` with each absolute path replaced by `<path1>`, `<path2>`, ... in argument order.
 

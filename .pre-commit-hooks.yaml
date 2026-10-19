@@ -1,0 +1,7 @@
+- id: tiggy-validate
+  name: tiggy validate
+  description: Check that a Tiggy spec loads and that everything in it refers to something that exists.
+  entry: tiggy validate
+  language: python
+  pass_filenames: false
+  files: \.(ya?ml|html|js|tpl)$

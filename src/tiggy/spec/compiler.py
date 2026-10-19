@@ -16,7 +16,7 @@ from tiggy.spec.convert import from_spec
 from tiggy.spec.loader import KINDS, LoadedSpec
 from tiggy.spec.overlay import COLLECTIONS, OWN_ID, fields
 from tiggy.spec.problems import Origin, Problem, SpecError
-from tiggy.spec.refs import CompileRefs, Template
+from tiggy.spec.refs import UNRESOLVED, CompileRefs, Template
 
 ACCOUNT_ID = "0"
 BY_SPEC_KEY = {key: (alias, model) for alias, (key, model, _) in COLLECTIONS.items()}
@@ -31,10 +31,27 @@ class Compiled:
     labels: dict[str, str] = field(default_factory=dict)  # gtag config compiled ID -> its spec label
 
 
+@dataclass
+class Checked:
+    """A spec compiled as far as its problems allow, so validate reports everything in one run."""
+
+    problems: list[Problem]
+    compiled: Compiled | None = None  # None when the problems leave no container to check
+    warnings: list[Problem] = field(default_factory=list)  # stray files, known once every $file is read
+
+
 def compile_spec(spec: LoadedSpec) -> Compiled:
+    checked = check_spec(spec)
+    if checked.problems or checked.compiled is None:
+        raise SpecError(checked.problems)
+    return checked.compiled
+
+
+def check_spec(spec: LoadedSpec) -> Checked:
     problems = spec.problems
-    # Resolving names against a spec missing a fragment would only add false "not defined" errors.
-    problems.raise_if_any()
+    if problems.problems:
+        # Resolving names against a spec missing a fragment would only add false "not defined" errors.
+        return Checked(list(problems.problems))
     reserved = _reserved(spec)
     container_id = _container_id(reserved["cvt"] | _gallery_types(spec))
     refs = CompileRefs(problems, container_id)
@@ -91,14 +108,25 @@ def compile_spec(spec: LoadedSpec) -> Compiled:
             items.append(item)
         version[alias] = items
 
-    problems.raise_if_any()
+    warnings = spec.unreferenced()
+    found = list(problems.problems)
     try:
         # Strict, from JSON, exactly as an export is read: nothing in a spec is coerced on the way.
-        compiled = ContainerVersion.model_validate_json(json.dumps(version), strict=True)
-        labels = {i: label for (key, label), i in ids.items() if key == "gtag_configs"}
-        return Compiled(compiled, origins, spec.unreferenced(), id_origins, labels)
+        compiled = ContainerVersion.model_validate_json(json.dumps(_resolved(version)), strict=True)
     except ValidationError as e:
-        raise SpecError([_located(spec, err) for err in e.errors()]) from e
+        # Alongside other problems, most likely their consequences, so not reported twice.
+        return Checked(found or [_located(spec, err) for err in e.errors()], None, warnings)
+    labels = {i: label for (key, label), i in ids.items() if key == "gtag_configs"}
+    return Checked(found, Compiled(compiled, origins, warnings, id_origins, labels), warnings)
+
+
+def _resolved(node: Any) -> Any:
+    """`node` without the references that failed, already reported, so checks don't report them again."""
+    if isinstance(node, dict):
+        return {k: _resolved(v) for k, v in node.items() if v != UNRESOLVED}
+    if isinstance(node, list):
+        return [_resolved(v) for v in node if v != UNRESOLVED]
+    return node
 
 
 def _located(spec: LoadedSpec, err: dict[str, Any]) -> Problem:

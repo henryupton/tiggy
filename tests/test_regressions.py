@@ -23,12 +23,14 @@ from tests.conftest import (
     FIXTURES,
     fragment_of,
     load_export,
+    problems_reported,
     replace_in_spec,
     run_tiggy,
     write_export,
 )
 from tests.fixtures.cdm import builders as b
-from tiggy import checks, cli
+from tiggy import checks, cli, report
+from tiggy.checks import Severity
 from tiggy.spec import importer
 from tiggy.spec.yamlio import Flow, YamlError, load, render
 
@@ -810,11 +812,11 @@ def test_explicit_list_and_map_members_must_be_lists(spec: Path):
     result = run_tiggy("validate", spec)
 
     assert result.code == 1, result
-    assert result.out.splitlines() == [
+    assert problems_reported(result) == [
         f"✗ {TAGS}:{first}: $list must be a list of parameters (or null), got '{{{{DLV - rows}}}}'",
         f'✗ {TAGS}:{first + 1}: $map must be a list of parameters (or null), got {{"a": "b"}}',
         f"✗ {TAGS}:{first + 2}: $list must be a list of parameters (or null), got 5",
-        "3 problems in the spec",
+        "3 errors, 0 warnings",
     ]
 
 
@@ -847,10 +849,10 @@ def test_a_trigger_reference_names_its_trigger_not_a_raw_id(spec: Path):
     result = run_tiggy("validate", spec)
 
     assert result.code == 1, result
-    assert result.out.splitlines() == [
+    assert problems_reported(result) == [
         f"✗ {TAGS}:{first}: a TRIGGER_REFERENCE names its trigger with $trigger, not a raw ID in $value",
         f"✗ {TAGS}:{first + 1}: $trigger is only for $type: TRIGGER_REFERENCE",
-        "2 problems in the spec",
+        "2 errors, 0 warnings",
     ]
 
 
@@ -861,12 +863,12 @@ def test_malformed_references_are_located_problems_not_tracebacks(spec: Path):
     result = run_tiggy("validate", spec)
 
     assert result.code == 1, result
-    assert result.out.splitlines() == [
+    assert problems_reported(result) == [
         f'✗ {TAGS}:4: {{"template": ["Amplitude Event"]}} is not a type '
         "(a GTM type string or {template: name})",
         f'✗ {TAGS}:7: {{"name": ["CE - track_event"]}} is not a trigger reference '
         "(a name, {built_in: ...}, or {trigger_id: ...})",
-        "2 problems in the spec",
+        "2 errors, 0 warnings",
     ]
 
 
@@ -908,12 +910,13 @@ def test_an_out_of_range_int32_priority_is_reported_with_the_other_problems(impo
     result = run_tiggy("validate", spec)
 
     assert result.code == 1, result
-    assert result.out.splitlines() == [
+    assert problems_reported(result) == [
         f"✗ {clients.relative_to(spec).as_posix()}:{line_of(clients, 'priority')}: "
         "priority must be at most 2147483647, got 2147483648",
         f"✗ {tags.relative_to(spec).as_posix()}:{line_of(tags, 'page_view_anonymous')}: "
-        'trigger "Event - page_view_anonymous" is not defined in this spec',
-        "2 problems in the spec",
+        'trigger "Event - page_view_anonymous" is not defined in this spec '
+        '(did you mean "Event - page_view_anon"?)',
+        "2 errors, 0 warnings",
     ]
 
 
@@ -931,11 +934,11 @@ def test_unmodelled_cant_set_a_modelled_field_by_either_spelling(spec: Path):
 
     assert result.code == 1, result
     prefix = f"✗ {TAGS}:{line}: unmodelled is for fields Tiggy doesn't know, and"
-    assert result.out.splitlines() == [
+    assert problems_reported(result) == [
         f"{prefix} 'liveOnly' is written as `live_only`",
         f"{prefix} 'live_only' is written as `live_only`",
         f"{prefix} 'tagId' is assigned by Tiggy, not written in a spec",
-        "3 problems in the spec",
+        "3 errors, 0 warnings",
     ]
 
 
@@ -946,9 +949,9 @@ def test_a_built_in_variable_in_a_spec_needs_its_name(spec: Path):
     result = run_tiggy("validate", spec)
 
     assert result.code == 1, result
-    assert result.out.splitlines() == [
+    assert problems_reported(result) == [
         f"✗ container.yml:{line}: a built-in variable needs its GTM name too, such as `name: Page URL`",
-        "1 problem in the spec",
+        "1 error, 0 warnings",
     ]
 
 
@@ -969,8 +972,8 @@ def test_a_broken_fragment_doesnt_cascade_into_false_problems(
 
     assert result.code == 1, result
     lines = result.out.splitlines()
-    assert len(lines) == 2 and lines[0].startswith(expected), result
-    assert lines[1] == "1 problem in the spec"
+    assert len(lines) == 3 and lines[0].startswith(expected), result
+    assert lines[1:] == ["", "1 error, 0 warnings"]
 
 
 def test_a_dangling_trigger_id_never_starts_resolving(spec: Path):
@@ -1137,7 +1140,7 @@ def test_yaml_a_fragment_cant_read_reaches_validate_as_problems_at_file_and_line
     lines = result.out.splitlines()
     assert lines[0].startswith(f"✗ {TRIGGERS}:{line_of(spec / TRIGGERS, 'arg1')}: not valid YAML")
     assert lines[1].startswith(f"✗ {VARIABLES}: not UTF-8 (byte ")
-    assert lines[2] == "2 problems in the spec"
+    assert lines[2:] == ["", "2 errors, 0 warnings"]
 
 
 def test_render_quotes_question_marks_and_colons_inside_flow():
@@ -1266,6 +1269,11 @@ def test_check_shows_a_window_into_a_long_value_not_the_whole_value(tmp_path: Pa
     difference = result.out.splitlines()[0]
     assert difference.startswith("≠ tags 'HTML - big': parameter[0].value (from line 202, character 39: ")
     assert len(difference) < 250
+
+
+def test_github_annotations_escape_what_workflow_commands_reserve():
+    annotation = report._annotation(Severity.WARNING, "a,b", "100%\nsure\x1b", "dir:1/x,y.yml:7")
+    assert annotation == "::warning file=dir%3A1/x%2Cy.yml,line=7,title=a%2Cb::100%25\\nsure\\x1b"
 
 
 def test_a_crash_exits_2_and_says_it_is_a_bug(monkeypatch):

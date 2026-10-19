@@ -38,10 +38,6 @@ class Collector:
     def add(self, origin: Origin | None, message: str) -> None:
         self.problems.append(Problem(origin, message))
 
-    def raise_if_any(self) -> None:
-        if self.problems:
-            raise SpecError(self.problems)
-
 
 def at(origin: Origin, node: Any, key: str | None = None) -> Origin:
     """The origin of a loaded node, or of one of its keys, within a file."""

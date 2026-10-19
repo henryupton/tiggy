@@ -45,6 +45,7 @@ CLOSED_STDOUT = "Error: stdout is closed, so there's nowhere to write\n"
 
 REPORT_KEYS = ["container", "counts", "summary", "files", "findings"]
 CONTAINER_KEYS = ["name", "publicId", "version"]
+ANALYTICS_HEADER = "Example - Analytics (GTM-TEST001): 11 tags, 6 triggers, 30 variables, 2 templates"
 SUMMARY_KEYS = ["errors", "warnings"]
 FINDING_KEYS = ["rule", "severity", "kind", "name", "id", "message", "location"]
 EXPORT_KEYS = ["exportFormatVersion", "exportTime", "containerVersion"]
@@ -216,7 +217,13 @@ def test_validate_exits_1_when_a_spec_file_does_not_load(imported):
     relpath, line = _with_bogus_key(spec)
     result = run_tiggy("validate", spec)
     assert result.code == 1, str(result)
-    assert result.out == f"✗ {relpath}:{line}: unknown key 'bogus_key' for a tag\n1 problem in the spec\n"
+    assert result.out.splitlines() == [
+        ANALYTICS_HEADER,
+        "",
+        f"✗ {relpath}:{line}: unknown key 'bogus_key' for a tag",
+        "",
+        "1 error, 0 warnings",
+    ]
 
 
 NOT_A_SOURCE = {  # input class: what stderr says after `Error: <path1>`
@@ -544,11 +551,6 @@ def test_validate_json_has_stable_keys_and_agrees_with_text(source: Path | str, 
     assert as_text.out.splitlines()[-1] == tally
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason='bug: when the spec doesn\'t load, --format json prints only {"problems": [...]}, so a CI '
-    "step reading .summary.errors gets nothing",
-)
 def test_validate_json_keeps_its_keys_when_the_spec_does_not_load(imported):
     spec = imported(ANALYTICS)
     _with_bogus_key(spec)
@@ -660,15 +662,14 @@ def test_a_spec_left_by_an_interrupted_import_is_refused(command: str, tmp_path:
     (spec / LOCK).touch()
     previous = tmp_path / "container.json"
     previous.write_bytes(b'{"previous": true}')
-    problem = f"✗ {LOCK}: {INTERRUPTED}\n1 problem in the spec\n"
     if command == "validate":
         result = run_tiggy("validate", spec)
         assert result.code == 1, str(result)
-        assert result.out == problem
+        assert result.out == f"✗ {LOCK}: {INTERRUPTED}\n\n1 error, 0 warnings\n"
     elif command == "export":
         result = run_tiggy("export", spec, "-o", previous)
         assert (result.code, result.raw_out) == (1, b""), str(result)
-        assert result.err == problem
+        assert result.err == f"✗ {LOCK}: {INTERRUPTED}\n1 problem in the spec\n"
         assert previous.read_bytes() == b'{"previous": true}'
     elif command == "check":
         result = run_tiggy("import", ANALYTICS, spec, "--check")

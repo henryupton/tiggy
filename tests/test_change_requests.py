@@ -24,6 +24,7 @@ from tests.conftest import (
     edit_spec,
     fragment_of,
     load_export,
+    problems_reported,
     replace_in_spec,
     run_tiggy,
     write_export,
@@ -312,9 +313,9 @@ def refused(spec: Path, *problems: str) -> None:
     """validate and export both refuse the spec with exactly these problems, and export writes nothing."""
     validated = run_tiggy("validate", spec)
     assert validated.code == 1, str(validated)
-    *reported, summary = validated.out.splitlines()
+    *reported, summary = problems_reported(validated)
     assert reported == [f"✗ {p}" for p in problems]
-    assert re.fullmatch(rf"{len(problems)} problems? in the spec", summary), summary
+    assert re.fullmatch(rf"{len(problems)} errors?, 0 warnings", summary), summary
     target = spec.parent / "exported.json"
     exported = run_tiggy("export", spec, "-o", target)
     assert exported.code == 1, str(exported)
@@ -556,7 +557,11 @@ def test_a_new_event_with_a_misspelt_trigger_is_refused_where_it_is_written(impo
 
     event = "events/video_progress.yml"
     line = line_of(spec, event, "- CE - track_event - video_progres")
-    refused(spec, f'{event}:{line}: trigger "CE - track_event - video_progres" is not defined in this spec')
+    refused(
+        spec,
+        f'{event}:{line}: trigger "CE - track_event - video_progres" is not defined in this spec'
+        ' (did you mean "CE - track_event - video_progress"?)',
+    )
 
 
 def test_a_new_event_reading_a_property_nobody_created_is_caught(imported):
@@ -736,7 +741,11 @@ def test_a_trigger_rename_that_misses_a_tag_is_refused(imported):
     )
 
     line = line_of(spec, "folders/ga4/tags.yml", "      - CE - sign_up")
-    refused(spec, f'folders/ga4/tags.yml:{line}: trigger "CE - sign_up" is not defined in this spec')
+    refused(
+        spec,
+        f'folders/ga4/tags.yml:{line}: trigger "CE - sign_up" is not defined in this spec'
+        ' (did you mean "CE - sign_up (all)"?)',
+    )
 
 
 # 5. Move an object to another file or folder fragment.
@@ -909,7 +918,9 @@ def test_a_folder_field_naming_no_folder_is_refused(imported):
 
     line = line_of(spec, "folders/data-layer/variables.yml", "folder: Data layer")
     refused(
-        spec, f'folders/data-layer/variables.yml:{line}: folder "Data layer" is not declared under folders'
+        spec,
+        f'folders/data-layer/variables.yml:{line}: folder "Data layer" is not declared under folders'
+        ' (did you mean "Data Layer"?)',
     )
 
 
@@ -1001,7 +1012,11 @@ def test_a_misspelt_blocking_trigger_is_refused_rather_than_blocking_nothing(imp
 
     relpath = fragment_of(spec, "tags", "GA4").relative_to(spec).as_posix()
     line = line_of(spec, relpath, "- Event - page_view_anonymous")
-    refused(spec, f'{relpath}:{line}: trigger "Event - page_view_anonymous" is not defined in this spec')
+    refused(
+        spec,
+        f'{relpath}:{line}: trigger "Event - page_view_anonymous" is not defined in this spec'
+        ' (did you mean "Event - page_view_anon"?)',
+    )
 
 
 # 7. Delete a tag.
@@ -1102,5 +1117,6 @@ def test_one_problem_reads_as_one_problem(imported):
         spec, "folders/triggers/triggers.yml", "  - name: CE - sign_up\n", "  - name: CE - sign_up (all)\n"
     )
 
-    result = run_tiggy("validate", spec)
-    assert result.out.splitlines()[-1] == "1 problem in the spec"
+    validated, exported = run_tiggy("validate", spec), run_tiggy("export", spec)
+    assert validated.out.splitlines()[-1] == "1 error, 0 warnings"
+    assert exported.err.splitlines()[-1] == "1 problem in the spec"
