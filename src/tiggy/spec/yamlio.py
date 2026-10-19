@@ -259,6 +259,12 @@ class _Loader:
                         "<< can't be a key: YAML readers take it for a merge key, quoted or not",
                         _line(key_event),
                     )
+                if flow and self.explicit_key(key_event.start_mark.index):
+                    raise YamlError(
+                        "drop the ? before a key inside {}: YAML readers disagree on whether ?a is the key "
+                        "a or ?a. Quote a key that starts with ?",
+                        _line(key_event),
+                    )
                 key = self.node(key_event, flow, indent, depth)
                 if not isinstance(key, str):
                     raise YamlError(_key_message(key_event), _line(key_event))
@@ -267,6 +273,13 @@ class _Loader:
                 mapping.key_lines[key] = _line(key_event)
                 mapping[key] = self.node(next(self.stream), flow, indent, depth)
         raise YamlError(f"unexpected YAML event {type(event).__name__}", _line(event))
+
+    def explicit_key(self, start: int) -> bool:
+        """Whether the key starting at `start` follows a `?` indicator."""
+        i = start - 1
+        while i >= 0 and self.text[i] in " \t\r\n":
+            i -= 1
+        return i >= 0 and self.text[i] == "?"
 
     def flow_tabs(self, start: int, end: int) -> None:
         """PyYAML refuses a tab used as a separator inside [] or {}, so Tiggy does too."""

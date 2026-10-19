@@ -93,8 +93,11 @@ def _silence(*streams) -> None:
             pass
 
 
-def _out(text: str, nl: bool = True) -> None:
-    """Output on stdout, where failing to write is a reason Tiggy couldn't run, not a bug."""
+def _out(text: str | bytes, nl: bool = True) -> None:
+    """Output on stdout, where failing to write is a reason Tiggy couldn't run, not a bug.
+
+    Bytes go out exactly, without the line endings a Windows text stream would add.
+    """
     if sys.stdout is None:
         raise InputError("stdout is closed, so there's nowhere to write")
     try:
@@ -230,10 +233,11 @@ def export_(spec_dir: Path, output: str | None) -> None:
         export.reads(text)
     except export.ExportError as e:
         raise InputError(f"the compiled container isn't one Tiggy can read back: {e}") from e
+    data = text.encode("utf-8")
     if output and output != "-":
-        _write(Path(output), text.encode("utf-8"))
+        _write(Path(output), data)
     else:
-        _out(text, nl=False)
+        _out(data, nl=False)  # the same bytes as -o, on every platform
     _print_warnings(compiled.warnings)
 
 

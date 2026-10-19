@@ -1410,6 +1410,13 @@ def large_container() -> dict[str, Any]:
 
 
 @pytest.mark.slow
+@pytest.mark.parametrize("text", ["k: {?a: v}\n", "k: {? a: v}\n", "k: {a: v, ?b: w}\n"])
+def test_an_explicit_key_inside_a_flow_mapping_is_refused(text: str):
+    """ruamel and yq 4.48 read {?a: v} as the key a; later yq, following the spec, reads ?a."""
+    with pytest.raises(YamlError, match=r"drop the \? before a key inside \{\}"):
+        load(text)
+
+
 def test_a_container_at_real_scale_imports_in_under_20_seconds_and_validates_in_under_10(tmp_path: Path):
     source = write_export(large_container(), tmp_path / "export.json")
     spec = tmp_path / "spec"

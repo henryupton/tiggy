@@ -185,13 +185,12 @@ def run_tiggy(
         out.seek(0)
         err.seek(0)
         raw_out, raw_err = out.read(), err.read()
-    return Result(
-        completed.returncode,
-        raw_out.decode("utf-8", errors="replace"),
-        raw_err.decode("utf-8", errors="replace"),
-        raw_out,
-        raw_err,
-    )
+    return Result(completed.returncode, _text(raw_out), _text(raw_err), raw_out, raw_err)
+
+
+def _text(raw: bytes) -> str:
+    """Output as text, with Windows' text-mode line endings read back as \\n, as `open()` would."""
+    return raw.decode("utf-8", errors="replace").replace(os.linesep, "\n")
 
 
 def scrub(text: str, *paths: str | os.PathLike) -> str:
