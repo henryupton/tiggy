@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from tiggy.gtm.resources import Parameter, ParameterType
+from tiggy.secrets import NAME, Resolve, SecretRef
 from tiggy.spec.problems import Collector, Origin, at, at_item, describe, difference, same
 from tiggy.spec.yamlio import Flow, Map, is_canonical_int
 
@@ -28,6 +29,7 @@ EXPLICIT_KEYS = {
     "$is_weak_reference",
     "$unmodelled",
 }
+SECRET_KEYS = {"$secret", "version"}
 _NO_SHORTHAND = object()
 
 
@@ -57,6 +59,8 @@ class Codec:
     trigger_id: Callable[[Any, Origin], str] | None = None
     read_file: Callable[[Any, Origin], str] | None = None
     problems: Collector | None = None
+    secret: Resolve | None = None  # a `{$secret: name}`'s value, fetched or stood in for
+    secret_for: Callable[[dict[str, Any]], str | None] | None = None  # on import, the name a value gets
     # Each node is encoded once per call, though the readable and explicit forms both need its children.
     _memo: dict[tuple[int, bool], Any] | None = field(default=None, init=False, repr=False)
 
@@ -122,8 +126,9 @@ class Codec:
 
     def _encode(self, p: dict[str, Any], keyed: bool) -> Any:
         key = p.get("key") if keyed else None
+        secret = self.secret_for(p) if self.secret_for else None
         try:
-            candidate = self._shorthand(p, keyed)
+            candidate = Flow({"$secret": secret}) if secret else self._shorthand(p, keyed)
         except ValueError:
             candidate = _NO_SHORTHAND
         if candidate is not _NO_SHORTHAND:
@@ -132,6 +137,8 @@ class Codec:
                     return candidate
             except ValueError:
                 pass
+        if secret:  # never fall back to a form that would write the value out
+            raise Unwritable("a secret only a plain value under its own key can reference")
         entries = p.get("map")
         if isinstance(entries, list):
             for i, entry in enumerate(entries):
@@ -202,6 +209,8 @@ class Codec:
             )
         elif isinstance(node, dict) and "$type" in node:
             return self._decode_explicit(node, key, at(origin, node))
+        elif isinstance(node, dict) and "$secret" in node:
+            p.update(type="TEMPLATE", value=self._secret(node, at(origin, node)))
         elif isinstance(node, dict) and set(node) == {"$file"}:
             p.update(type="TEMPLATE", value=self.read(node, at(origin, node)))
         elif isinstance(node, dict):
@@ -322,6 +331,25 @@ class Codec:
             self._problem(origin, "$file can't be read here")
             return ""
         return self.read_file(node["$file"], origin)
+
+    def _secret(self, node: dict[str, Any], origin: Origin) -> str:
+        name, version = node["$secret"], node.get("version")
+        if set(node) - SECRET_KEYS:
+            self._problem(
+                origin, f"a $secret takes version and nothing else, not {sorted(set(node) - SECRET_KEYS)}"
+            )
+        if not isinstance(name, str) or not NAME.fullmatch(name):
+            self._problem(at(origin, node, "$secret"), f"$secret names a secret, got {describe(name)}")
+            return ""
+        if version is not None and (not isinstance(version, str) or not version):
+            self._problem(
+                at(origin, node, "version"), f"version is a string such as '3', got {describe(version)}"
+            )
+            return ""
+        if self.secret is None:
+            self._problem(origin, "secrets can't be read here")
+            return ""
+        return self.secret(SecretRef(name, version), origin)
 
     def _trigger(self, ref: Any, origin: Origin) -> str:
         if self.trigger_id is None:

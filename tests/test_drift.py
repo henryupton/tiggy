@@ -23,6 +23,7 @@ from tests.conftest import (
     export_id,
     load_export,
     run_tiggy,
+    unread_note,
     write_export,
 )
 
@@ -121,10 +122,10 @@ def differences(result: Result) -> dict[tuple[str, str], list[str]]:
     return dict(found)
 
 
-def assert_drift(result: Result, expected: dict[tuple[str, str], list[str]]) -> None:
+def assert_drift(result: Result, expected: dict[tuple[str, str], list[str]], note: str = "") -> None:
     """Exit 1, exactly the `expected` objects named, and each with every one of its fragments."""
     assert result.code == 1, result
-    assert result.err == "", result
+    assert result.err == note, result
     found = differences(result)
     assert sorted(found) == sorted(expected), result
     for subject, fragments in expected.items():
@@ -199,6 +200,7 @@ def test_deleting_the_trigger_that_keeps_anonymous_page_views_from_ga4_is_drift(
             ("triggers", "Event - page_view_anon"): ["only in the spec"],
             ("tags", "GA4"): ["locking", "missing from the container"],
         },
+        note=unread_note(SERVER),
     )
 
 
@@ -377,7 +379,7 @@ def test_what_gtm_changes_without_meaning_anything_is_not_drift(export, noise, i
     path = write_export(live, tmp_path / "live.json")
     result = run_tiggy("import", path, spec, "--check")
     assert result.code == 0, result
-    assert (result.out, result.err) == (f"{spec} is equivalent to {path}\n", ""), result
+    assert (result.out, result.err) == (f"{spec} is equivalent to {path}\n", unread_note(export)), result
 
 
 # Known gaps: written as the behaviour the analytics team needs
@@ -503,7 +505,7 @@ def test_a_container_read_through_the_tag_manager_api_checks_clean(export, impor
     _api_spelling(live["containerVersion"])
     assert live["containerVersion"]["container"]["usageContext"][0] in ("web", "server")
     result = check(tmp_path, spec, live)
-    assert (result.code, result.err) == (0, ""), result
+    assert (result.code, result.err) == (0, unread_note(export)), result
     assert result.out.startswith(f"{spec} is equivalent to "), result
 
 

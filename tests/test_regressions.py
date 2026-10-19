@@ -633,8 +633,8 @@ def test_an_import_whose_spec_reads_back_differently_writes_nothing(
     target = tmp_path / "spec"
     compile_ = importer.compile_spec
 
-    def lossy(spec):
-        compiled = compile_(spec)
+    def lossy(spec, secrets=None):
+        compiled = compile_(spec, secrets)
         compiled.version.tag[0].notes = "added on the way back"
         return compiled
 
@@ -1289,7 +1289,7 @@ def test_a_crash_exits_2_and_says_it_is_a_bug(monkeypatch):
 
 
 def test_an_interrupt_exits_130(monkeypatch):
-    def interrupt(graph):
+    def interrupt(graph, spec=False):
         raise KeyboardInterrupt
 
     monkeypatch.setattr(checks, "run", interrupt)

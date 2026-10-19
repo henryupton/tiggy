@@ -5,7 +5,7 @@ variables:
     folder: Settings
     format_value: {}
     parameter:
-      value: TEST_TOKEN_NOT_A_SECRET
+      value: {$secret: const-meta-api-token}
   - name: const - meta pixel id
     type: c
     folder: Settings

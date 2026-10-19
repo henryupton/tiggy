@@ -193,6 +193,42 @@ def _text(raw: bytes) -> str:
     return raw.decode("utf-8", errors="replace").replace(os.linesep, "\n")
 
 
+FAKES = TESTS / "fakes"  # a stand-in boto3, so specs naming secrets export offline
+
+
+def secret_store(directory: Path, values: Mapping[str, str]) -> dict[str, str]:
+    """The environment for a run that reads secrets from a fake AWS store holding `values`."""
+    directory.mkdir(parents=True, exist_ok=True)
+    store, targets = directory / "secrets.json", directory / "targets.yml"
+    store.write_text(json.dumps(dict(values)), encoding="utf-8")
+    targets.write_text("tiggy: 1\nsecrets:\n  aws:\n    region: test-region\n", encoding="utf-8")
+    return {"TIGGY_TARGETS": str(targets), "TIGGY_FAKE_SECRETS": str(store), "PYTHONPATH": str(FAKES)}
+
+
+def export_secrets(export: str | os.PathLike) -> dict[str, str]:
+    """The secrets `tiggy import` finds in an export, by the name it writes for each."""
+    from tiggy.spec.importer import find_secrets
+
+    return find_secrets(load_export(export)["containerVersion"]).values
+
+
+def store_for(export: str | os.PathLike, directory: Path) -> dict[str, str]:
+    """A fake secret store holding what the spec imported from `export` names."""
+    return secret_store(directory, export_secrets(export))
+
+
+def unread_note(export: str | os.PathLike) -> str:
+    """What `import --check` says on stderr about the secrets it didn't fetch for this export's spec."""
+    from tiggy.spec.importer import find_secrets
+
+    n = len(find_secrets(load_export(export)["containerVersion"]).names)
+    return (
+        f"note: {n} secret value{'' if n == 1 else 's'} not compared (--resolve-secrets to compare them)\n"
+        if n
+        else ""
+    )
+
+
 FINDING_LINE = re.compile(r'[✗⚠] [a-z][a-z -]* "')
 
 

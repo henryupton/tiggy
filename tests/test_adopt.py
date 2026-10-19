@@ -25,6 +25,8 @@ from tests.conftest import (
     load_export,
     run_tiggy,
     scrub,
+    store_for,
+    unread_note,
     write_export,
 )
 
@@ -164,7 +166,7 @@ def test_a_fresh_plan_after_adopting_is_a_no_op(export: Path, imported):
     result = run_tiggy("import", export, spec, "--check")
     assert result.code == 0, str(result)
     assert scrub(result.out, spec, export) == "<path1> is equivalent to <path2>\n"
-    assert result.err == ""
+    assert result.err == unread_note(export)
 
 
 @pytest.mark.parametrize("export", ALL_EXPORTS, ids=export_id)
@@ -173,8 +175,9 @@ def test_exporting_the_adopted_spec_and_adopting_that_reproduces_it_byte_for_byt
 ):
     spec = imported(export)
     compiled, again = tmp_path / "compiled.json", tmp_path / "again"
+    store = store_for(export, tmp_path / "store")
     for args in (("export", spec, "-o", compiled), ("import", compiled, again)):
-        result = run_tiggy(*args)
+        result = run_tiggy(*args, env=store)
         assert result.code == 0, f"tiggy {' '.join(map(str, args))}\n{result}"
     assert _files(again) == _files(spec)
 

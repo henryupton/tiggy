@@ -9,6 +9,7 @@ import tempfile
 import traceback
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -18,6 +19,8 @@ from tiggy.graph import ContainerGraph, Kind, Node
 from tiggy.gtm.resources import BuiltInVariable
 from tiggy.io import export
 from tiggy.report import plural, printable
+from tiggy.secrets import Fetching, Offline, Resolve, SecretError, Store, is_placeholder, load_targets
+from tiggy.spec import canon
 from tiggy.spec.compiler import Compiled, check_spec, compile_spec
 from tiggy.spec.importer import ImportError_, check, import_version, umask
 from tiggy.spec.loader import load_spec, looks_like_spec
@@ -160,7 +163,7 @@ def validate(source: Path, fmt: str, strict: bool) -> None:
     if source.is_dir():
         _require_spec(source)
         prefix = _prefix(source)
-        checked = check_spec(load_spec(source))
+        checked = check_spec(load_spec(source), Offline())
         problems = _relocated(checked.problems, prefix)
         files = [str(w) for w in _relocated(checked.warnings, prefix)]
         if checked.compiled is not None:
@@ -178,7 +181,7 @@ def validate(source: Path, fmt: str, strict: bool) -> None:
             raise InputError(f"{source}: Tiggy reads a value differently from how it's written, at {misread}")
         graph = ContainerGraph(read.export.container_version)
     if graph is not None:
-        findings = checks.run(graph)
+        findings = checks.run(graph, spec=source.is_dir())
     if problems:  # warnings wait for a spec that compiles: unused or never-fires may only echo a problem
         findings = [f for f in findings if f.severity is Severity.ERROR]
     _out(FORMATS[fmt](graph, findings, locations, files, problems))
@@ -187,19 +190,37 @@ def validate(source: Path, fmt: str, strict: bool) -> None:
         raise SystemExit(1)
 
 
+TARGETS = click.option(
+    "--targets",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    envvar="TIGGY_TARGETS",
+    help="The targets file naming the secret store (or set TIGGY_TARGETS).",
+)
+
+
 @cli.command("import")
 @click.argument("source", type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.argument("spec_dir", type=click.Path(file_okay=False, path_type=Path))
 @click.option(
     "--check", "check_only", is_flag=True, help="Compare instead of writing; exit 1 if they differ."
 )
+@click.option(
+    "--resolve-secrets", is_flag=True, help="With --check, fetch secrets and compare their values too."
+)
+@TARGETS
 @exits_2_on_crash
-def import_(source: Path, spec_dir: Path, check_only: bool) -> None:
+def import_(
+    source: Path, spec_dir: Path, check_only: bool, resolve_secrets: bool, targets: Path | None
+) -> None:
     """Write a container export out as a YAML spec in SPEC_DIR.
 
-    The spec is proven to compile back to the same container before it is written. With
-    --check, nothing is written: SOURCE is compared with the spec already in SPEC_DIR.
+    The spec is proven to compile back to the same container before it is written, and secrets
+    (access tokens, API secrets) are written as {$secret: name} references, never their values.
+    With --check, nothing is written: SOURCE is compared with the spec already in SPEC_DIR, and
+    secret values only with --resolve-secrets.
     """
+    if resolve_secrets and not (check_only and targets):
+        raise InputError("--resolve-secrets is for --check, with --targets naming the secret store")
     if sys.stdout is None and not check_only:  # refused before anything is written, not after
         raise InputError(CLOSED_STDOUT)
     read = _read_export(source)
@@ -212,13 +233,19 @@ def import_(source: Path, spec_dir: Path, check_only: bool) -> None:
         _err(f"{click.style('!', fg='yellow')} {printable(f'{finding.node}: {finding.message}')}")
     if check_only:
         _require_spec(spec_dir)
+        fetching = Fetching(_store(targets)) if resolve_secrets and targets else None
         try:
-            comparison = check(read.raw_version, spec_dir)
+            comparison = check(read.raw_version, spec_dir, fetching)
         except SpecError as e:
             raise InputError(f"the spec in {spec_dir} doesn't load:\n{_problems(e, spec_dir)}") from e
         except ImportError_ as e:
             raise InputError(str(e)) from e
+        if fetching and fetching.failures:
+            raise InputError("can't read the spec's secrets:\n" + "\n".join(fetching.failures))
         _print_warnings(comparison.warnings)
+        if comparison.unread_secrets:
+            unread = plural(comparison.unread_secrets, "secret value")
+            _err(f"note: {unread} not compared (--resolve-secrets to compare them)")
         differences = comparison.differences
         if differences:
             for line in differences:
@@ -241,6 +268,13 @@ def import_(source: Path, spec_dir: Path, check_only: bool) -> None:
     _out(f"Imported {click.style(printable(name), bold=True)} into {into}")
     _out(f"  {len(result.fragments)} YAML files, {len(result.sidecars)} code files")
     _out(click.style("  verified: the spec compiles back to the same container", fg="green"))
+    if result.secrets:
+        _out(
+            f"\n{plural(len(result.secrets), 'secret')} written as {{$secret: name}}. Before exporting, put "
+            "each value in the secret store your targets file names, under its name:"
+        )
+        for name, where in result.secrets.items():
+            _out(f"  {printable(name)}  (from {printable(where)})")
     if result.sidecars:
         _out(f"\nCode files must stay byte-exact. {_precommit_hint(spec_dir)}")
 
@@ -253,10 +287,22 @@ def import_(source: Path, spec_dir: Path, check_only: bool) -> None:
     type=click.Path(dir_okay=False, allow_dash=True, readable=False),
     help="Write here, not stdout (- is stdout too).",
 )
+@TARGETS
 @exits_2_on_crash
-def export_(spec_dir: Path, output: str | None) -> None:
-    """Compile a spec to a container export, the JSON GTM's Import Container reads."""
-    compiled = _compile(spec_dir)
+def export_(spec_dir: Path, output: str | None, targets: Path | None) -> None:
+    """Compile a spec to a container export, the JSON GTM's Import Container reads.
+
+    Each {$secret: name} is read from the store --targets names, since an export holds the value.
+    """
+    secrets = Fetching(_store(targets)) if targets else Offline()
+    compiled = _compile(spec_dir, secrets)
+    if isinstance(secrets, Offline) and secrets.refs:
+        names = ", ".join(sorted({str(ref) for ref in secrets.refs}))
+        raise InputError(f"the spec names secrets ({names}); --targets says where to read them from")
+    if isinstance(secrets, Fetching) and secrets.failures:
+        raise InputError("can't read the spec's secrets:\n" + "\n".join(secrets.failures))
+    if _holds_placeholder(canon.dump(compiled.version)):  # unreachable unless the above has a hole
+        raise InputError("a secret has no value, so the export would be wrong")
     stamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
     text = export.dumps(
         export.ContainerExport(exportFormatVersion=2, exportTime=stamp, containerVersion=compiled.version)
@@ -305,16 +351,31 @@ def _problems(error: SpecError, spec_dir: Path) -> str:
     return "\n".join(printable(str(p)) for p in _relocated(error.problems, _prefix(spec_dir)))
 
 
-def _compile(spec_dir: Path) -> Compiled:
+def _compile(spec_dir: Path, secrets: Resolve) -> Compiled:
     """A spec compiled, or its problems on stderr and exit 1 (exit 2 when it isn't a spec at all)."""
     _require_spec(spec_dir)
     try:
-        return compile_spec(load_spec(spec_dir))
+        return compile_spec(load_spec(spec_dir), secrets)
     except SpecError as e:
         for problem in _relocated(e.problems, _prefix(spec_dir)):
             _err(f"{click.style('✗', fg='red')} {printable(str(problem))}")
         _err(click.style(f"{plural(len(e.problems), 'problem')} in the spec", fg="red"))
         raise SystemExit(1) from e
+
+
+def _store(targets: Path) -> Store:
+    try:
+        return load_targets(targets)
+    except SecretError as e:
+        raise InputError(str(e)) from e
+
+
+def _holds_placeholder(node: Any) -> bool:
+    if isinstance(node, dict):
+        return any(_holds_placeholder(v) for v in node.values())
+    if isinstance(node, list):
+        return any(_holds_placeholder(v) for v in node)
+    return is_placeholder(node)
 
 
 def _prefix(spec_dir: Path) -> str:

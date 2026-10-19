@@ -21,6 +21,10 @@ classifiers = [
     "Topic :: Internet :: WWW/HTTP :: Site Management",
 ]
 
+[project.optional-dependencies]
+gcp = ["google-auth[requests]>=2.20"]
+aws = ["boto3>=1.28"]
+
 [project.urls]
 Repository = "https://github.com/henryupton/tiggy"
 

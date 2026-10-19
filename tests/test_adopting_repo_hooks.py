@@ -29,6 +29,7 @@ from tests.conftest import (
     export_id,
     load_export,
     run_tiggy,
+    store_for,
     write_export,
 )
 
@@ -220,9 +221,9 @@ def _assert_check_names(result: Result, damaged: set[tuple[str, str]]) -> None:
     assert f"{len(damaged)} difference" in result.out.splitlines()[-1], str(result)
 
 
-def _validate_and_export(spec: Path, output: Path) -> tuple[int, str, int, str, bytes]:
+def _validate_and_export(spec: Path, output: Path, store: dict[str, str]) -> tuple[int, str, int, str, bytes]:
     validated = run_tiggy("validate", spec)
-    exported = run_tiggy("export", spec, "-o", output)
+    exported = run_tiggy("export", spec, "-o", output, env=store)
     assert exported.code == 0, str(exported)
     data = EXPORT_TIME.sub(b'"exportTime": ""', output.read_bytes())
     return validated.code, validated.out, exported.code, exported.err, data
@@ -319,14 +320,14 @@ def test_validate_alone_notices_the_fixers_rewrote_a_sidecar(source: Path, impor
 def test_a_windows_checkout_with_crlf_fragments_validates_and_exports_identically(
     source: Path, imported: Callable[..., Path], tmp_path: Path
 ):
-    spec = imported(source)
-    as_imported = _validate_and_export(spec, tmp_path / "lf.json")
+    spec, store = imported(source), store_for(source, tmp_path / "store")
+    as_imported = _validate_and_export(spec, tmp_path / "lf.json", store)
     for rel, body in _snapshot(spec).items():
         if not rel.endswith(CODE_SUFFIXES):  # what core.autocrlf converts, given import's .gitattributes
             assert b"\r" not in body, f"{rel} already holds a CR"
             (spec / rel).write_bytes(body.replace(b"\n", b"\r\n"))
 
-    assert _validate_and_export(spec, tmp_path / "crlf.json") == as_imported
+    assert _validate_and_export(spec, tmp_path / "crlf.json", store) == as_imported
     assert check_yaml.main([str(f) for f in _fragments(spec)]) == 0
 
 

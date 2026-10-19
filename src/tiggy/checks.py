@@ -9,7 +9,8 @@ from enum import StrEnum
 from tiggy.graph import ContainerGraph, Kind, Node, Reference
 from tiggy.gtm import builtins
 from tiggy.gtm.base import GtmEnum, GtmModel
-from tiggy.gtm.resources import Tag
+from tiggy.gtm.resources import Parameter, Tag, Variable
+from tiggy.secrets import is_placeholder, secret_bearing
 
 
 class Severity(StrEnum):
@@ -27,6 +28,7 @@ class Finding:
 
 Check = Callable[[ContainerGraph], Iterable[Finding]]
 CHECKS: list[Check] = []
+SPEC_CHECKS: list[Check] = []  # about how a spec is written, so not for an export
 KIND_ORDER = list(Kind)
 
 
@@ -35,8 +37,13 @@ def check(fn: Check) -> Check:
     return fn
 
 
-def run(graph: ContainerGraph) -> list[Finding]:
-    findings = [f for check_ in CHECKS for f in check_(graph)]
+def spec_check(fn: Check) -> Check:
+    SPEC_CHECKS.append(fn)
+    return fn
+
+
+def run(graph: ContainerGraph, spec: bool = False) -> list[Finding]:
+    findings = [f for check_ in CHECKS + (SPEC_CHECKS if spec else []) for f in check_(graph)]
     return sorted(
         findings,
         key=lambda f: (f.severity != Severity.ERROR, KIND_ORDER.index(f.node.kind), f.node.name, f.message),
@@ -224,3 +231,53 @@ def _unknown_values(model: GtmModel, path: str = "") -> Iterator[tuple[str, GtmE
                 yield here, item
             elif isinstance(item, GtmModel):
                 yield from _unknown_values(item, here)
+
+
+@spec_check
+def literal_secrets(graph: ContainerGraph) -> Iterator[Finding]:
+    """A credential written into the spec, where every clone and fork of the repository keeps it."""
+    constants = {n.name: n for n in graph.of_kind(Kind.VARIABLE) if isinstance(n.resource, Variable)}
+    flagged = set()
+    for node in graph.nodes:
+        for param in _params(node.resource):
+            value = param.value
+            if (
+                not secret_bearing(param.key)
+                or not isinstance(value, str)
+                or not value
+                or is_placeholder(value)
+            ):
+                continue
+            whole = value[2:-2] if value.startswith("{{") and value.endswith("}}") else None
+            if whole in constants and constants[whole] not in flagged and _literal(constants[whole].resource):
+                flagged.add(constants[whole])
+                message = (
+                    f'its value is the secret {node.kind} "{node.name}" sends as {param.key}, in plain text'
+                )
+                yield Finding("literal-secret", Severity.WARNING, constants[whole], f"{message}; {HOW}")
+            elif "{{" not in value:
+                yield Finding(
+                    "literal-secret", Severity.WARNING, node, f"{param.key} is in plain text; {HOW}"
+                )
+
+
+HOW = "reference it as {$secret: name} and keep the value in a secret store"
+
+
+def _literal(variable: Variable) -> bool:
+    return variable.type == "c" and any(
+        p.key == "value" and isinstance(p.value, str) and p.value and not is_placeholder(p.value)
+        for p in variable.parameter or []
+    )
+
+
+def _params(model: GtmModel | None) -> Iterator[Parameter]:
+    if model is None:
+        return
+    for name in type(model).model_fields:
+        value = getattr(model, name)
+        for item in value if isinstance(value, list) else [value]:
+            if isinstance(item, Parameter):
+                yield item
+            if isinstance(item, GtmModel):
+                yield from _params(item)

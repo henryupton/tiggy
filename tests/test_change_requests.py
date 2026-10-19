@@ -27,6 +27,7 @@ from tests.conftest import (
     problems_reported,
     replace_in_spec,
     run_tiggy,
+    store_for,
     write_export,
 )
 
@@ -280,7 +281,9 @@ def lands(spec: Path, expected: Path, strict: bool = True) -> None:
     """The spec validates, exports, and is equivalent to `expected`, the same change made to the export."""
     validated = run_tiggy("validate", spec, *(["--strict"] if strict else []))
     assert validated.code == 0, str(validated)
-    exported = run_tiggy("export", spec, "-o", spec.parent / "exported.json")
+    exported = run_tiggy(
+        "export", spec, "-o", spec.parent / "exported.json", env=store_for(expected, spec.parent / "store")
+    )
     assert exported.code == 0, str(exported)
     checked = run_tiggy("import", expected, spec, "--check")
     assert (checked.code, checked.out) == (0, f"{spec} is equivalent to {expected}\n"), str(checked)

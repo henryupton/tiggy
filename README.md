@@ -101,6 +101,8 @@ Exits 0 when written or equivalent, 1 when `--check` finds differences, 2 when i
 Code files (`.html`, `.js`, `.tpl`) must stay byte-exact, so keep whitespace fixers away from them; import writes a
 `.gitattributes` and `.editorconfig` that do this for git and editors.
 
+Credentials are written as references, never values; see [Secrets](#secrets).
+
 ## export
 
 ```bash
@@ -109,7 +111,46 @@ tiggy export spec/ -o container.json
 
 Compiles a spec to a container export with fresh IDs, on stdout unless `-o` names a file. Problems go to stderr,
 so a broken spec never writes half an export. It reimports to the same spec byte for byte; whether GTM's own
-Import Container accepts it hasn't been tried yet.
+Import Container accepts it hasn't been tried yet. A spec that names secrets needs `--targets` to export.
+
+## Secrets
+
+An access token or API secret in a spec would live in every clone and fork of the repository, so import writes
+each one as a reference and lists what to put in your secret store:
+
+```yaml
+- name: const - meta api token
+  type: c
+  parameter:
+    value: {$secret: const-meta-api-token}              # the latest version
+    # value: {$secret: const-meta-api-token, version: '3'}  # or a pinned one
+```
+
+Import treats a value as a secret when its parameter key names one (`accessToken`, `apiSecret`, `apiKey`,
+`password` and the like), either directly or through a constant variable the parameter uses whole. The same
+value in several places is one secret. `validate` warns about a credential written in plain text in a spec.
+
+Where secrets live is not the spec's business: a targets file names the store, so the same spec reads from
+staging and production stores unchanged.
+
+```yaml
+tiggy: 1
+secrets:
+  gcp:                            # GCP Secret Manager, or aws: {region: us-east-1} for AWS Secrets Manager
+    project: my-tracking-project
+    prefix: gtm/server/           # optional, before every name
+```
+
+```bash
+pip install 'tiggy-cli[gcp]'  # or tiggy-cli[aws]
+tiggy export spec/ -o container.json --targets targets.yml  # or set TIGGY_TARGETS
+tiggy import live.json spec/ --check --resolve-secrets --targets targets.yml
+```
+
+Each store uses its own default credentials (`gcloud auth application-default login`, an AWS profile). Only
+`export` and `--check --resolve-secrets` read secrets. Plain `--check` and `validate` never do: `--check` notes
+how many secret values it didn't compare, and still reports one emptied or removed in the container. No command
+prints a secret's value; a token rotated in the UI shows as `<secret name, not the stored value>`.
 
 ## validate
 

@@ -6,6 +6,7 @@ canon. Only an exact match is moved into place; anything else leaves the target 
 
 import json
 import os
+import re
 import shutil
 import tempfile
 from collections import Counter
@@ -16,6 +17,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from tiggy.gtm.resources import BuiltInVariable, Container, ContainerVersion, CustomTemplate
+from tiggy.secrets import Fetching, Offline, SecretRef, is_placeholder, secret_bearing
 from tiggy.spec import canon, layout
 from tiggy.spec.codec import Codec
 from tiggy.spec.compiler import compile_spec
@@ -42,6 +44,19 @@ class ImportResult:
     counts: Counter = field(default_factory=Counter)
     fragments: list[str] = field(default_factory=list)
     sidecars: list[str] = field(default_factory=list)
+    secrets: dict[str, str] = field(default_factory=dict)  # the name written for each, -> where it was
+
+
+@dataclass
+class Secrets:
+    """The secrets in an export: the parameters holding one, and the value and origin of each name."""
+
+    names: dict[int, str] = field(default_factory=dict)  # id() of a parameter -> its secret's name
+    values: dict[str, str] = field(default_factory=dict)
+    origins: dict[str, str] = field(default_factory=dict)
+
+    def resolve(self, ref: SecretRef, origin: Any) -> str:
+        return self.values.get(ref.name, ref.placeholder)
 
 
 def import_version(source: dict[str, Any], spec_dir: Path) -> ImportResult:
@@ -64,7 +79,8 @@ def import_version(source: dict[str, Any], spec_dir: Path) -> ImportResult:
             "isn't supported yet; use --check to compare instead"
         )
     _preconditions(source)
-    planned, result = _plan(source)
+    secrets = find_secrets(source)
+    planned, result = _plan(source, secrets)
     files = {}
     for path, tree in planned.fragments.items():
         try:
@@ -75,22 +91,23 @@ def import_version(source: dict[str, Any], spec_dir: Path) -> ImportResult:
     files.update({".gitattributes": GITATTRIBUTES.encode(), ".editorconfig": EDITORCONFIG.encode()})
     try:
         if existing is not None:
-            _commit_into(target, files, source)
+            _commit_into(target, files, source, secrets)
         else:
-            _commit_new(target, files, source)
+            _commit_new(target, files, source, secrets)
     except OSError as e:
         raise ImportError_(f"can't write {e.filename or spec_dir}: {e.strerror or e}") from e
     result.fragments = sorted(planned.fragments)
     result.sidecars = sorted(planned.sidecars)
+    result.secrets = dict(sorted(secrets.origins.items()))
     return result
 
 
-def _commit_new(target: Path, files: dict[str, bytes], source: dict[str, Any]) -> None:
+def _commit_new(target: Path, files: dict[str, bytes], source: dict[str, Any], secrets: Secrets) -> None:
     created = _make_parents(target.parent)
     try:
         staging = Path(tempfile.mkdtemp(prefix=".tiggy-import-", dir=target.parent))
         try:
-            _stage(staging, files, source)
+            _stage(staging, files, source, secrets)
             os.chmod(staging, 0o777 & ~umask())
             os.rename(staging, target)  # refuses a directory another import has filled meanwhile
         finally:
@@ -121,7 +138,7 @@ def _make_parents(directory: Path) -> list[Path]:
     return created[::-1]
 
 
-def _commit_into(target: Path, files: dict[str, bytes], source: dict[str, Any]) -> None:
+def _commit_into(target: Path, files: dict[str, bytes], source: dict[str, Any], secrets: Secrets) -> None:
     """Fill an existing empty directory in place, so its inode, mode and anyone's cwd in it survive."""
     lock = target / LOCK
     try:
@@ -133,7 +150,7 @@ def _commit_into(target: Path, files: dict[str, bytes], source: dict[str, Any]) 
         if any(child.name != LOCK for child in target.iterdir()):
             raise ImportError_(f"something else wrote into {target} while importing")
         staging = Path(tempfile.mkdtemp(prefix=".tiggy-import-", dir=target))
-        _stage(staging, files, source)
+        _stage(staging, files, source, secrets)
         moved = []
         try:
             for child in sorted(staging.iterdir()):
@@ -149,19 +166,21 @@ def _commit_into(target: Path, files: dict[str, bytes], source: dict[str, Any]) 
         lock.unlink(missing_ok=True)
 
 
-def _stage(staging: Path, files: dict[str, bytes], source: dict[str, Any]) -> None:
-    """Write the spec and prove it reproduces the source before it goes anywhere."""
+def _stage(staging: Path, files: dict[str, bytes], source: dict[str, Any], secrets: Secrets) -> None:
+    """Write the spec and prove it reproduces the source (secrets included) before it goes anywhere."""
     for path, data in files.items():
         _write(staging / path, data)
     try:
-        compiled = compile_spec(load_spec(staging))
+        compiled = compile_spec(load_spec(staging), secrets.resolve)
     except SpecError as e:
         raise ImportError_(f"the spec Tiggy wrote doesn't load back, which is a bug in Tiggy:\n{e}") from e
-    difference = canon.compare(source, canon.dump(compiled.version), ("the export", "the written spec"))
+    names = {value: name for name, value in secrets.values.items()}
+    left, right = (_hidden(v, names) for v in (source, canon.dump(compiled.version)))
+    difference = canon.compare(left, right, ("the export", "the written spec"))
     if difference is None and _public_id(compiled.version) != source["container"].get("publicId"):
         difference = "container.publicId"
     if difference is not None:
-        raise ImportError_(f"the written spec doesn't reproduce the container, at {difference}")
+        raise ImportError_(f"the written spec doesn't reproduce the container, at {_shown(difference)}")
     if compiled.warnings:
         raise ImportError_(f"the written spec has stray files: {compiled.warnings[0]}")
 
@@ -170,13 +189,22 @@ def _stage(staging: Path, files: dict[str, bytes], source: dict[str, Any]) -> No
 class Comparison:
     differences: list[str]  # empty when the container and the spec are equivalent
     warnings: list[Problem]  # about the spec's files, which don't affect equivalence
+    unread_secrets: int = 0  # secret values not compared, since none were fetched
 
 
-def check(source: dict[str, Any], spec_dir: Path) -> Comparison:
-    """What differs between a ContainerVersion as exported and a spec."""
+def check(source: dict[str, Any], spec_dir: Path, secrets: Fetching | None = None) -> Comparison:
+    """What differs between a ContainerVersion as exported and a spec, secrets fetched by `secrets`.
+
+    Without `secrets`, nothing is fetched: a secret only has to have some value in the export. With it,
+    each is compared with what it fetches, and either way no secret's value is ever shown.
+    """
     _preconditions(source)
     left = canon.canon(source)
-    compiled = compile_spec(load_spec(spec_dir))
+    offline = Offline()
+    compiled = compile_spec(load_spec(spec_dir), offline)
+    values = None
+    if secrets is not None:
+        values = {ref.placeholder: secrets(ref, origin) for ref, origin in offline.refs.items()}
     expected, found = _public_id(compiled.version), source["container"].get("publicId")
     if expected is not None and found != expected:
         raise ImportError_(
@@ -187,6 +215,7 @@ def check(source: dict[str, Any], spec_dir: Path) -> Comparison:
         right = canon.canon(canon.dump(compiled.version))
     except canon.CanonError as e:
         raise ImportError_(f"can't compare with {spec_dir}: {e}") from e
+    left, unread = _masked(left, right, values)
     differences = []
     for key in sorted(set(left) | set(right)):
         name = COLLECTIONS[key][0] if key in COLLECTIONS else VERSION_FIELDS.get(key, key)
@@ -205,7 +234,42 @@ def check(source: dict[str, Any], spec_dir: Path) -> Comparison:
                     differences.append(f"{name} {identity!r}: {found}")
         elif found := canon.difference(left[key], right[key], sides=SIDES):
             differences.append(f"{name}: {found}")
-    return Comparison(differences, compiled.warnings)
+    return Comparison([_shown(d) for d in differences], compiled.warnings, unread)
+
+
+def _shown(difference: str) -> str:
+    return re.sub(r"'\\x00secret:([^']*)'", r"<secret \1>", difference)
+
+
+def _hidden(node: Any, names: dict[str, str]) -> Any:
+    """`node` with each string that is a secret's value swapped for that secret's stand-in."""
+    if isinstance(node, dict):
+        return {key: _hidden(value, names) for key, value in node.items()}
+    if isinstance(node, list):
+        return [_hidden(value, names) for value in node]
+    return SecretRef(names[node]).placeholder if isinstance(node, str) and node in names else node
+
+
+def _masked(left: Any, right: Any, values: dict[str, str] | None) -> tuple[Any, int]:
+    """`left` with the value at each of the spec's secrets replaced by the secret's stand-in.
+
+    Without `values`, any non-empty value counts as the secret, unread. With them, a value that isn't
+    the secret's becomes a second stand-in, so the difference shows without showing either value.
+    """
+    if is_placeholder(right) and isinstance(left, str):
+        if values is None:
+            return (right, 1) if left else (left, 0)
+        return (right, 0) if values.get(right) == left else (f"{right}, not the stored value", 0)
+    if isinstance(left, dict) and isinstance(right, dict):
+        out, count = {}, 0
+        for key, value in left.items():
+            out[key], n = _masked(value, right[key], values) if key in right else (value, 0)
+            count += n
+        return out, count
+    if isinstance(left, list) and isinstance(right, list) and len(left) == len(right):
+        pairs = [_masked(a, b, values) for a, b in zip(left, right, strict=True)]
+        return [value for value, _ in pairs], sum(n for _, n in pairs)
+    return left, 0
 
 
 def _public_id(version: ContainerVersion) -> str | None:
@@ -257,9 +321,69 @@ def umask() -> int:
     return mask
 
 
-def _plan(source: dict[str, Any]) -> tuple[layout.Plan, ImportResult]:
+def find_secrets(source: dict[str, Any]) -> Secrets:
+    """Each value a secret-bearing parameter holds, or names whole as a constant variable (`{{name}}`)."""
+    found = Secrets()
+    constants = {
+        v.get("name"): p
+        for v in source.get("variable") or []
+        if v.get("type") == "c"
+        for p in v.get("parameter") or []
+        if p.get("key") == "value" and p.get("type") == "TEMPLATE" and isinstance(p.get("value"), str)
+    }
+    by_value: dict[str, str] = {}
+
+    def record(param: dict[str, Any], label: str, where: str) -> None:
+        value = param["value"]
+        if value not in by_value:
+            name, n = layout.slug(label, "secret"), 2
+            while name in found.values:
+                name, n = f"{layout.slug(label, 'secret')}-{n}", n + 1
+            by_value[value] = name
+            found.values[name], found.origins[name] = value, where
+        found.names[id(param)] = by_value[value]
+
+    for alias, (key, _, _) in COLLECTIONS.items():
+        for item in source.get(alias) or []:
+            for param in _parameters(item):
+                value = param.get("value")
+                if not secret_bearing(param.get("key")) or param.get("type") != "TEMPLATE":
+                    continue
+                if not isinstance(value, str) or not value:
+                    continue
+                whole = re.fullmatch(r"\{\{([^{}]+)\}\}", value)
+                if whole and whole[1] in constants:
+                    record(constants[whole[1]], whole[1], f"variable {whole[1]!r}")
+                elif "{{" not in value:
+                    owner = item.get("name") or item.get("type")
+                    record(
+                        param,
+                        f"{owner} {param['key']}",
+                        f"{key[:-1].replace('_', ' ')} {owner!r}, {param['key']}",
+                    )
+    return found
+
+
+def _parameters(node: Any):
+    """Every parameter in an object, nested ones in lists and maps included."""
+    if isinstance(node, dict):
+        if isinstance(node.get("key"), str) and "type" in node:
+            yield node
+        for value in node.values():
+            yield from _parameters(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _parameters(value)
+
+
+def _plan(source: dict[str, Any], secrets: Secrets) -> tuple[layout.Plan, ImportResult]:
     refs = ImportRefs(source)
-    codec = Codec(trigger_ref=refs.trigger_ref, trigger_id=refs.trigger_id)
+    codec = Codec(
+        trigger_ref=refs.trigger_ref,
+        trigger_id=refs.trigger_id,
+        secret=secrets.resolve,
+        secret_for=lambda p: secrets.names.get(id(p)),
+    )
     result = ImportResult()
     try:
         container = to_spec(Container, source["container"], refs, codec)

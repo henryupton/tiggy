@@ -20,6 +20,7 @@ from tests.conftest import (
     export_id,
     load_export,
     run_tiggy,
+    store_for,
 )
 from tests.fixtures.cdm import build
 
@@ -130,13 +131,14 @@ def test_cdm_templates_are_shaped_like_real_ones(export: Path):
 def test_export_imports_checks_and_round_trips(export: Path, tmp_path: Path):
     """import writes a spec, --check finds it equivalent, and export then import reproduces it exactly."""
     spec, again, compiled = tmp_path / "spec", tmp_path / "again", tmp_path / "compiled.json"
+    store = store_for(export, tmp_path / "store")
     for args in (
         ("import", export, spec),
         ("import", export, spec, "--check"),
         ("export", spec, "-o", compiled),
         ("import", compiled, again),
     ):
-        result = run_tiggy(*args)
+        result = run_tiggy(*args, env=store)
         assert result.code == 0, f"tiggy {' '.join(map(str, args))}\n{result}"
     assert _files(again) == _files(spec)
 
@@ -172,6 +174,7 @@ VENDOR_HOSTS = {  # public hosts real exports name, and why a fixture may too
     "developers.google.com": "the terms notice atop gallery templates",
     "googletagmanager.com": "where gtm.js and gtag.js load from",
     "google-analytics.com": "where analytics.js and GA collection live",
+    "secretmanager.googleapis.com": "where GCP secrets are read from",
 }
 NOT_HOSTS = {"tiggy.io"}  # Tiggy's own module, which a test may import
 # A bare hostname is a dotted name ending in one of these. Code's dotted names (os.path,

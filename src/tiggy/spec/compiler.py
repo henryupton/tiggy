@@ -11,6 +11,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from tiggy.gtm.resources import Container, ContainerVersion
+from tiggy.secrets import Resolve
 from tiggy.spec.codec import Codec
 from tiggy.spec.convert import from_spec
 from tiggy.spec.loader import KINDS, LoadedSpec
@@ -40,14 +41,15 @@ class Checked:
     warnings: list[Problem] = field(default_factory=list)  # stray files, known once every $file is read
 
 
-def compile_spec(spec: LoadedSpec) -> Compiled:
-    checked = check_spec(spec)
+def compile_spec(spec: LoadedSpec, secrets: Resolve | None = None) -> Compiled:
+    checked = check_spec(spec, secrets)
     if checked.problems or checked.compiled is None:
         raise SpecError(checked.problems)
     return checked.compiled
 
 
-def check_spec(spec: LoadedSpec) -> Checked:
+def check_spec(spec: LoadedSpec, secrets: Resolve | None = None) -> Checked:
+    """`secrets` gives each `{$secret: name}` its value; without it, a spec naming one has a problem."""
     problems = spec.problems
     if problems.problems:
         # Resolving names against a spec missing a fragment would only add false "not defined" errors.
@@ -55,7 +57,7 @@ def check_spec(spec: LoadedSpec) -> Checked:
     reserved = _reserved(spec)
     container_id = _container_id(reserved["cvt"] | _gallery_types(spec))
     refs = CompileRefs(problems, container_id)
-    codec = Codec(trigger_id=refs.trigger_id, read_file=spec.read_file, problems=problems)
+    codec = Codec(trigger_id=refs.trigger_id, read_file=spec.read_file, problems=problems, secret=secrets)
 
     ids: dict[tuple[str, str], str] = {}
     for key, entries in spec.collections.items():
