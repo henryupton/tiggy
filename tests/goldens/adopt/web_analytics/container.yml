@@ -1,39 +1,22 @@
 tiggy: 1
 container:
   name: Example - Analytics
+  public_id: GTM-TEST001
   notes: Loaded before consent. Analytics only; ad pixels live in Example - Marketing.
   usage_context:
     - WEB
-  features:
-    support_built_in_variables: true
-    support_clients: false
-    support_environments: true
-    support_folders: true
-    support_gtag_configs: false
-    support_tags: true
-    support_templates: true
-    support_transformations: false
-    support_triggers: true
-    support_user_permissions: true
-    support_variables: true
-    support_versions: true
-    support_workspaces: true
-    support_zones: true
-version:
-  name: Add wishlist_id to GA4 and Amplitude
-  description: 'wishlist_id joins the payload, GA4 - wishlist and Amplitude - track_event.'
 built_in_variables:
-  - type: PAGE_URL
-    name: Page URL
-  - type: PAGE_HOSTNAME
-    name: Page Hostname
-  - type: PAGE_PATH
-    name: Page Path
-  - type: REFERRER
-    name: Referrer
-  - type: EVENT
-    name: Event
   - type: CONTAINER_VERSION
     name: Container Version
   - type: DEBUG_MODE
     name: Debug Mode
+  - type: EVENT
+    name: Event
+  - type: PAGE_HOSTNAME
+    name: Page Hostname
+  - type: PAGE_PATH
+    name: Page Path
+  - type: PAGE_URL
+    name: Page URL
+  - type: REFERRER
+    name: Referrer

@@ -216,7 +216,7 @@ def test_validate_exits_1_when_a_spec_file_does_not_load(imported):
     relpath, line = _with_bogus_key(spec)
     result = run_tiggy("validate", spec)
     assert result.code == 1, str(result)
-    assert result.out == f"✗ {relpath}:{line}: unknown key 'bogus_key' for a tag\n1 problems in the spec\n"
+    assert result.out == f"✗ {relpath}:{line}: unknown key 'bogus_key' for a tag\n1 problem in the spec\n"
 
 
 NOT_A_SOURCE = {  # input class: what stderr says after `Error: <path1>`
@@ -273,19 +273,21 @@ def test_validate_exits_2_on_an_export_it_cannot_read(tmp_path: Path):
 
 
 def test_validate_exits_2_on_an_export_it_would_misread(tmp_path: Path):
-    """The team's API tool speaks the API's lowerCamel enums; an export pasted from it isn't GTM's own."""
-
-    def api_spelling(version: dict[str, Any]) -> None:
-        assert version["trigger"][0]["type"] == "CUSTOM_EVENT"
-        version["trigger"][0]["type"] = "customEvent"
-
-    export = _variant(tmp_path, "pasted.json", api_spelling)
+    """A key spelled like a field's Python name isn't GTM's, and pydantic would silently drop it."""
+    export = _variant(tmp_path, "pasted.json", _python_field_name)
     result = run_tiggy("validate", export)
     assert result.code == 2, str(result)
     assert scrub(result.err, export) == (
-        "Error: <path1>: Tiggy reads a value differently from how it's written, at trigger[0].type "
-        "('customEvent' in the export, 'CUSTOM_EVENT' in Tiggy's reading)\n"
+        "Error: <path1>: Tiggy reads a value differently from how it's written, at tag[0].live_only "
+        "(missing from Tiggy's reading)\n"
     )
+
+
+def test_validate_reads_an_export_in_the_apis_spelling(tmp_path: Path):
+    """The team's API tool speaks the API's lowerCamel enums, which read as the export's UPPER_SNAKE."""
+    export = _variant(tmp_path, "pasted.json", _api_spelled_enum)
+    as_api, as_exported = run_tiggy("validate", export), run_tiggy("validate", ANALYTICS)
+    assert (as_api.code, as_api.out, as_api.err) == (as_exported.code, as_exported.out, as_exported.err)
 
 
 # import
@@ -327,7 +329,12 @@ def test_import_exits_2_on_a_directory_that_is_not_empty(occupant: str, tmp_path
 
 
 def _api_spelled_enum(version: dict[str, Any]) -> None:
+    assert version["trigger"][0]["type"] == "CUSTOM_EVENT"
     version["trigger"][0]["type"] = "customEvent"
+
+
+def _python_field_name(version: dict[str, Any]) -> None:
+    version["tag"][0]["live_only"] = True
 
 
 def _cloned_without_renaming(version: dict[str, Any]) -> None:
@@ -338,13 +345,13 @@ def _cloned_without_renaming(version: dict[str, Any]) -> None:
     "edit, says",
     [
         (
-            _api_spelled_enum,
-            "Tiggy reads a value differently from how the export writes it, at trigger[0].type "
-            "('customEvent' in the export, 'CUSTOM_EVENT' in Tiggy's reading)",
+            _python_field_name,
+            "Tiggy reads a value differently from how the export writes it, at tag[0].live_only "
+            "(missing from Tiggy's reading)",
         ),
         (_cloned_without_renaming, "2 tags are named 'Google tag'"),
     ],
-    ids=["API enum spelling", "clone left with its name"],
+    ids=["Python field name", "clone left with its name"],
 )
 def test_import_exits_2_on_an_export_it_would_misread_and_writes_nothing(
     edit: Edit, says: str, tmp_path: Path
@@ -376,7 +383,7 @@ def test_check_exits_1_and_names_what_drifted(tmp_path: Path, imported):
     result = run_tiggy("import", live, spec, "--check")
     assert result.code == 1, str(result)
     assert scrub(result.out, live, spec) == (
-        "≠ tags 'GA4 - sign_up': paused (missing from the spec)\n1 differences between <path1> and <path2>\n"
+        "≠ tags 'GA4 - sign_up': paused (missing from the spec)\n1 difference between <path1> and <path2>\n"
     )
     assert _snapshot(spec) == before, "--check writes nothing"
 
@@ -429,9 +436,7 @@ def test_export_of_a_broken_spec_exits_1_with_problems_on_stderr_only(tmp_path: 
         result = run_tiggy("export", spec, *args)
         assert result.code == 1, str(result)
         assert result.raw_out == b""
-        assert (
-            result.err == f"✗ {relpath}:{line}: unknown key 'bogus_key' for a tag\n1 problems in the spec\n"
-        )
+        assert result.err == f"✗ {relpath}:{line}: unknown key 'bogus_key' for a tag\n1 problem in the spec\n"
     assert previous.read_bytes() == b'{"previous": true}'
 
 
@@ -489,11 +494,6 @@ def test_a_failed_export_write_leaves_the_previous_file(case: str, tmp_path: Pat
 
 
 @PERMISSIONS
-@pytest.mark.xfail(
-    strict=True,
-    reason="bug: with nowhere to stage beside it (read-only directory), -o overwrites a writable file in "
-    "place, so a write that fails part way leaves it truncated",
-)
 def test_a_failed_export_write_in_a_read_only_directory_leaves_the_previous_file(tmp_path: Path, imported):
     spec = imported(ANALYTICS)
     out = tmp_path / "build"
@@ -643,11 +643,6 @@ def test_export_to_a_file_does_not_need_stdout(tmp_path: Path, imported):
 
 
 @POSIX
-@pytest.mark.xfail(
-    strict=True,
-    reason="bug: import writes the spec before finding stdout closed, then exits 2 (couldn't run), "
-    "so a retry hits `already exists and isn't empty`",
-)
 def test_import_with_a_closed_stdout_writes_nothing(tmp_path: Path):
     spec = tmp_path / "spec"
     result = _run("import", ANALYTICS, spec, close_stdout=True)
@@ -665,7 +660,7 @@ def test_a_spec_left_by_an_interrupted_import_is_refused(command: str, tmp_path:
     (spec / LOCK).touch()
     previous = tmp_path / "container.json"
     previous.write_bytes(b'{"previous": true}')
-    problem = f"✗ {LOCK}: {INTERRUPTED}\n1 problems in the spec\n"
+    problem = f"✗ {LOCK}: {INTERRUPTED}\n1 problem in the spec\n"
     if command == "validate":
         result = run_tiggy("validate", spec)
         assert result.code == 1, str(result)
@@ -755,11 +750,6 @@ def test_json_output_keeps_names_exactly(tmp_path: Path):
 # Encodings and colour
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="known gap: a stdout that can't encode ✗ or ≠ (PYTHONIOENCODING=cp1252) crashes into exit 2 "
-    "with a traceback instead of reporting",
-)
 @pytest.mark.parametrize("command", ["validate with findings", "check with drift"])
 def test_findings_still_exit_1_on_a_non_utf8_stdout(command: str, tmp_path: Path, imported):
     if command == "validate with findings":
@@ -792,7 +782,6 @@ def test_a_terminal_gets_colour_by_default():
 
 
 @POSIX
-@pytest.mark.xfail(strict=True, reason="known gap: NO_COLOR is ignored where colour is on (a terminal)")
 def test_no_color_turns_colour_off_on_a_terminal():
     code, out = _on_a_terminal("validate", LEGACY, env={"NO_COLOR": "1"})
     assert code == 1

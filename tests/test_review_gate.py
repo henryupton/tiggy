@@ -403,7 +403,7 @@ def test_json_carries_the_same_findings_as_the_text_report(imported, breaker):
         assert matches(broken.summary, out[-1]), text
         return
     assert payload["container"]["name"] == "Example - Analytics"
-    assert out[0].startswith("Example - Analytics: "), text
+    assert out[0].startswith("Example - Analytics (GTM-TEST001): "), text
     assert report_lines(payload) == out[2:-2], f"{text}\n{data}"
     summary = payload["summary"]
     assert out[-1] == f"{plural(summary['errors'], 'error')}, {plural(summary['warnings'], 'warning')}"
@@ -517,7 +517,6 @@ def test_locations_are_relative_to_the_repository_root_when_run_from_it(imported
     assert located and all(where.startswith(prefix) for where in located), data
 
 
-@pytest.mark.xfail(strict=True, reason='bug: a spec with one problem ends "1 problems in the spec"')
 def test_a_single_spec_problem_is_counted_in_the_singular(imported):
     spec, _ = broken_spec(imported, rename_a_trigger_but_not_its_tags)
     result = validate(spec)

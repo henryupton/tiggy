@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import Field, ValidationError
 
-from tiggy.gtm.base import GtmModel, export_spelling
+from tiggy.gtm.base import GtmModel, export_spelled, export_spelling
 from tiggy.gtm.resources import ContainerVersion
 from tiggy.spec.problems import difference
 
@@ -28,7 +28,11 @@ ENVELOPE = {"exportFormatVersion", "exportTime", "containerVersion"}
 
 @dataclass(frozen=True)
 class Source:
-    """An export both as Tiggy reads it and exactly as written, so nothing read can pass unnoticed."""
+    """An export both as Tiggy reads it and as written, so nothing read can pass unnoticed.
+
+    `raw` is the JSON exactly as written, bar enum values the Tag Manager API spells lowerCamel, which
+    read as the UPPER_SNAKE an export from the GTM UI uses.
+    """
 
     export: ContainerExport
     raw: dict[str, Any]
@@ -76,6 +80,8 @@ def reads(text: str) -> Source:
         raise ExportError("not valid JSON: nested too deeply") from e
     if not isinstance(raw, dict):
         raise ExportError("not a GTM container export: the top level isn't an object")
+    if isinstance(raw.get("containerVersion"), dict):
+        raw["containerVersion"] = export_spelled(ContainerVersion, raw["containerVersion"])
     try:
         # Strict: a value GTM would never write ("true" for true, 5.0 for 5) is refused, not coerced.
         export = ContainerExport.model_validate_json(text, strict=True)

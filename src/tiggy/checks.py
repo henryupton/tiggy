@@ -8,7 +8,7 @@ from enum import StrEnum
 
 from tiggy.graph import ContainerGraph, Kind, Node, Reference
 from tiggy.gtm import builtins
-from tiggy.gtm.base import GtmModel
+from tiggy.gtm.base import GtmEnum, GtmModel
 from tiggy.gtm.resources import Tag
 
 
@@ -200,3 +200,27 @@ def _extras(model: GtmModel, path: str = "") -> Iterator[str]:
         for item in items:
             if isinstance(item, GtmModel):
                 yield from _extras(item, here)
+
+
+@check
+def unmodelled_enums(graph: ContainerGraph) -> Iterator[Finding]:
+    for node in graph.nodes:
+        if node.resource is None:
+            continue
+        for path, value in _unknown_values(node.resource):
+            hint = _suggest(value.value, (m.export_value for m in type(value)))
+            message = (
+                f"{path} {value.value} isn't in Tiggy's copy of GTM's API schema{hint}; it is kept as-is"
+            )
+            yield Finding("unmodelled-enum", Severity.WARNING, node, message)
+
+
+def _unknown_values(model: GtmModel, path: str = "") -> Iterator[tuple[str, GtmEnum]]:
+    for name, info in type(model).model_fields.items():
+        value = getattr(model, name)
+        here = f"{path}.{info.alias}" if path else info.alias
+        for item in value if isinstance(value, list) else [value]:
+            if isinstance(item, GtmEnum) and not item.known:
+                yield here, item
+            elif isinstance(item, GtmModel):
+                yield from _unknown_values(item, here)

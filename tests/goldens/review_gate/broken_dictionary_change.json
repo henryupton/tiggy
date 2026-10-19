@@ -1,8 +1,8 @@
 {
   "container": {
     "name": "Example - Analytics",
-    "publicId": null,
-    "version": "0"
+    "publicId": "GTM-TEST001",
+    "version": null
   },
   "counts": {
     "tag": 11,

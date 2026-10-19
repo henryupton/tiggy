@@ -70,7 +70,12 @@ same in ruamel.yaml, PyYAML and yq, and it reads hand-written YAML only where th
 
 Nothing is defaulted or inferred: a field in the YAML is a field in GTM, and an absent one is absent. A field
 Tiggy doesn't model yet goes under `unmodelled:` and passes through untouched; one it does model has to be written
-under its own key.
+under its own key. An enum value newer than Tiggy's copy of the API schema (`CONSENT_UPDATE` for a trigger type,
+say) passes through too, with an `unmodelled-enum` warning that `--strict` fails on.
+
+What GTM sets is left out: IDs, fingerprints, the container's feature flags, and a version's name and description,
+which label a publish rather than configure the container. The one exception is `container.public_id`, which isn't
+compared as content but asserts which container the spec belongs to.
 
 Code lives in sidecar files named by `{$file: path}`, relative to the spec root and spelled exactly as on disk
 (case and Unicode form included, since Linux checkouts compare names exactly). Links, to files or directories,
@@ -87,7 +92,9 @@ Writes the spec into a new or empty directory. Before anything lands, the writte
 compared with the export file as written, so only GTM-assigned IDs and bookkeeping may differ. An export Tiggy
 can't reproduce exactly (a value it would read differently, two objects with one name) is refused, not
 approximated. `--check` writes nothing and lists what differs between the export and an existing spec, which makes
-it a drift gate for CI.
+it a drift gate for CI. It refuses an export of another container than the spec's `public_id`, so a staging copy
+can't pass for production. Exports from the Tag Manager API, which spells enums `customEvent` rather than
+`CUSTOM_EVENT`, read the same as the UI's.
 
 Exits 0 when written or equivalent, 1 when `--check` finds differences, 2 when it can't run.
 
@@ -120,7 +127,8 @@ Exits 0 when valid, 1 when not (`--strict` counts warnings; a spec file it can't
 the input isn't a spec or an export, or is an export Tiggy would misread. `import --check` exits 2 on a spec that
 doesn't load, since 1 there means the two differ.
 
-Every command exits 130 when interrupted and 141 when whatever reads its output stops early (`| head`).
+Every command exits 130 when interrupted and 141 when whatever reads its output stops early (`| head`). Output is
+coloured only on a terminal, and never when `NO_COLOR` is set.
 
 ## How it fits together
 

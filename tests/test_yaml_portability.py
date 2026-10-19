@@ -808,13 +808,6 @@ def test_a_tree_at_the_nesting_limit_writes_and_reads_everywhere(make: Callable[
 # 4. Known gaps
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=YamlError,
-    reason="known gap: _one_line_mapping doesn't recurse into dicts inside lists, so a Flow holding a list "
-    "of Flow mappings whose key is past YAML's 1024-character implicit-key limit is written inline and "
-    "render raises rather than writing it in block form",
-)
 def test_a_flow_list_of_mappings_with_a_very_long_key_still_writes():
     tree = {"": Flow({"": [Flow({"x" * 1100: None})]})}
     text = yamlio.render(tree)

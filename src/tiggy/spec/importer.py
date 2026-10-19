@@ -86,15 +86,39 @@ def import_version(source: dict[str, Any], spec_dir: Path) -> ImportResult:
 
 
 def _commit_new(target: Path, files: dict[str, bytes], source: dict[str, Any]) -> None:
-    target.parent.mkdir(parents=True, exist_ok=True)
-    staging = Path(tempfile.mkdtemp(prefix=".tiggy-import-", dir=target.parent))
+    created = _make_parents(target.parent)
     try:
-        _stage(staging, files, source)
-        os.chmod(staging, 0o777 & ~umask())
-        os.rename(staging, target)  # refuses a directory another import has filled meanwhile
-    finally:
-        if staging.exists():
-            shutil.rmtree(staging)
+        staging = Path(tempfile.mkdtemp(prefix=".tiggy-import-", dir=target.parent))
+        try:
+            _stage(staging, files, source)
+            os.chmod(staging, 0o777 & ~umask())
+            os.rename(staging, target)  # refuses a directory another import has filled meanwhile
+        finally:
+            if staging.exists():
+                shutil.rmtree(staging)
+    except BaseException:
+        for directory in created:
+            try:
+                directory.rmdir()
+            except OSError:  # something else has written there meanwhile
+                break
+        raise
+
+
+def _make_parents(directory: Path) -> list[Path]:
+    """Create `directory` and its missing parents; those this created, deepest first."""
+    missing = []
+    while not directory.exists():
+        missing.append(directory)
+        directory = directory.parent
+    created = []
+    for path in reversed(missing):
+        try:
+            path.mkdir()
+        except FileExistsError:
+            continue
+        created.append(path)
+    return created[::-1]
 
 
 def _commit_into(target: Path, files: dict[str, bytes], source: dict[str, Any]) -> None:
@@ -134,6 +158,8 @@ def _stage(staging: Path, files: dict[str, bytes], source: dict[str, Any]) -> No
     except SpecError as e:
         raise ImportError_(f"the spec Tiggy wrote doesn't load back, which is a bug in Tiggy:\n{e}") from e
     difference = canon.compare(source, canon.dump(compiled.version), ("the export", "the written spec"))
+    if difference is None and _public_id(compiled.version) != source["container"].get("publicId"):
+        difference = "container.publicId"
     if difference is not None:
         raise ImportError_(f"the written spec doesn't reproduce the container, at {difference}")
     if compiled.warnings:
@@ -151,6 +177,12 @@ def check(source: dict[str, Any], spec_dir: Path) -> Comparison:
     _preconditions(source)
     left = canon.canon(source)
     compiled = compile_spec(load_spec(spec_dir))
+    expected, found = _public_id(compiled.version), source["container"].get("publicId")
+    if expected is not None and found != expected:
+        raise ImportError_(
+            f"{spec_dir} is the spec for container {expected}, but the export is of "
+            f"{found or 'a container with no public ID'}"
+        )
     try:
         right = canon.canon(canon.dump(compiled.version))
     except canon.CanonError as e:
@@ -174,6 +206,10 @@ def check(source: dict[str, Any], spec_dir: Path) -> Comparison:
         elif found := canon.difference(left[key], right[key], sides=SIDES):
             differences.append(f"{name}: {found}")
     return Comparison(differences, compiled.warnings)
+
+
+def _public_id(version: ContainerVersion) -> str | None:
+    return version.container.public_id if version.container else None
 
 
 def _preconditions(source: dict[str, Any]) -> None:
@@ -230,7 +266,11 @@ def _plan(source: dict[str, Any]) -> tuple[layout.Plan, ImportResult]:
         version = to_spec(ContainerVersion, source, refs, codec)
         built_ins = None
         if source.get("builtInVariable") is not None:
-            built_ins = [to_spec(BuiltInVariable, b, refs, codec) for b in source["builtInVariable"]]
+            # Sorted, as layout sorts every collection, so how a spec splits them never shows on re-import.
+            built_ins = sorted(
+                (to_spec(BuiltInVariable, b, refs, codec) for b in source["builtInVariable"]),
+                key=lambda node: str(node.get("type")),
+            )
         objects: list[SpecObject] = []
         empty = []
         for alias, (key, model, _) in COLLECTIONS.items():

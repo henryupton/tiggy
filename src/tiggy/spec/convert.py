@@ -4,7 +4,7 @@ import re
 from difflib import get_close_matches
 from typing import Any, get_args, get_origin
 
-from tiggy.gtm.base import GtmEnum, GtmModel
+from tiggy.gtm.base import UNKNOWN, GtmEnum, GtmModel
 from tiggy.spec.codec import Codec, Unwritable
 from tiggy.spec.overlay import SPEC_ONLY_KEYS, UNMODELLED, Role, fields
 from tiggy.spec.problems import Collector, Origin, at, at_item, describe
@@ -90,6 +90,9 @@ def from_spec(
                     out[extra] = item
             continue
         f = known.get(key)
+        if f is None and key in _gtm_owned(model):
+            problems.add(here, f"{key} isn't written in a spec: GTM sets it, and Tiggy compares without it")
+            continue
         if f is None:
             hint = get_close_matches(key, list(known), n=1)
             problems.add(
@@ -169,15 +172,23 @@ def _check_scalar(value: Any, annotation: Any, key: str, origin: Origin, problem
                 _check_scalar(item, get_args(annotation)[0], key, here, problems)
         return
     if isinstance(annotation, type) and issubclass(annotation, GtmEnum):
-        allowed = [m.export_value for m in annotation]
-        if value not in allowed:
-            problems.add(origin, f"{key}: {describe(value)} is not one of {', '.join(allowed)}")
+        # Any other UPPER_SNAKE value is one newer than the vendored schema; validate warns about it.
+        api = next((m for m in annotation if m.value == value and m.value != m.export_value), None)
+        if api is not None:
+            problems.add(origin, f"{key}: {value} is the API's spelling; a spec writes {api.export_value}")
+        elif not isinstance(value, str) or not UNKNOWN.fullmatch(value):
+            allowed = ", ".join(m.export_value for m in annotation)
+            problems.add(origin, f"{key}: {describe(value)} is not one of {allowed}")
         return
     expected = {str: str, int: int, bool: bool, float: (int, float)}.get(annotation)
     if expected is None:
         return
     if isinstance(value, bool) and annotation is not bool or not isinstance(value, expected):
         problems.add(origin, f"{key} must be {EXPECTED[annotation]}, got {describe(value)}")
+
+
+def _gtm_owned(model: type[GtmModel]) -> set[str]:
+    return {f.key for f in fields(model) if f.role is Role.DROPPED}
 
 
 def _noun(model: type[GtmModel]) -> str:

@@ -520,11 +520,18 @@ class _Emitter:
 
 
 def _one_line_mapping(value: dict[str, Any]) -> bool:
-    """A Flow mapping stays on one line unless a key is past YAML's implicit-key limit."""
+    """A Flow mapping stays on one line unless a key at any depth in it is past YAML's implicit-key limit."""
     return isinstance(value, Flow) and all(
-        len(_one_line(k, flow=True)) <= MAX_IMPLICIT_KEY and (not isinstance(v, dict) or _one_line_mapping(v))
-        for k, v in value.items()
+        len(_one_line(k, flow=True)) <= MAX_IMPLICIT_KEY and _fits_one_line(v) for k, v in value.items()
     )
+
+
+def _fits_one_line(value: Any) -> bool:
+    if isinstance(value, dict):
+        return _one_line_mapping(value)
+    if isinstance(value, list):
+        return all(_fits_one_line(v) for v in value)
+    return True
 
 
 def _inline(value: Any) -> str:

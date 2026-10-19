@@ -383,9 +383,6 @@ def test_what_gtm_changes_without_meaning_anything_is_not_drift(export, noise, i
 # Known gaps: written as the behaviour the analytics team needs
 
 
-@pytest.mark.xfail(
-    strict=True, reason="known gap: a version's name and description are compared as container content"
-)
 @pytest.mark.parametrize("label", ["renamed", "unnamed"])
 def test_publishing_with_only_a_new_version_name_is_not_drift(label, imported, tmp_path):
     def relabel(version):
@@ -429,11 +426,6 @@ def _moved_to(export: dict[str, Any], container_id: str, public_id: str) -> dict
     return moved
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="known gap: the spec doesn't record the container's public ID, so another container is "
-    "compared object by object (and an identical copy passes)",
-)
 @pytest.mark.parametrize("case", ["the_marketing_container", "a_staging_copy"])
 def test_checking_the_wrong_container_says_so(case, imported, tmp_path):
     spec = imported(ANALYTICS)
@@ -445,6 +437,16 @@ def test_checking_the_wrong_container_says_so(case, imported, tmp_path):
     assert result.code == 2, result
     assert "GTM-TEST001" in result.err and public_id in result.err, result
     assert "≠" not in result.out, result
+
+
+def test_a_spec_without_a_public_id_is_compared_object_by_object(imported, tmp_path):
+    """Written before specs recorded one, so there is nothing to assert, and the objects decide."""
+    spec = imported(ANALYTICS)
+    container_yml = spec / "container.yml"
+    text = container_yml.read_bytes().decode("utf-8")
+    container_yml.write_bytes(text.replace("  public_id: GTM-TEST001\n", "").encode("utf-8"))
+    assert run_tiggy("import", ANALYTICS, spec, "--check").code == 0
+    assert check(tmp_path, spec, load_export(MARKETING)).code == 1
 
 
 @pytest.mark.xfail(strict=True, reason="known gap: only the first difference in each object is listed")
@@ -494,10 +496,6 @@ def _api_spelling(node: Any) -> None:
                 _api_spelling(value)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="known gap: the Tag Manager API's lowerCamel enum values are refused as a misreading (exit 2)",
-)
 @pytest.mark.parametrize("export", CDM_EXPORTS, ids=export_id)
 def test_a_container_read_through_the_tag_manager_api_checks_clean(export, imported, tmp_path):
     spec = imported(export)
@@ -509,11 +507,6 @@ def test_a_container_read_through_the_tag_manager_api_checks_clean(export, impor
     assert result.out.startswith(f"{spec} is equivalent to "), result
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="known gap: an enum value newer than Tiggy's vendored API schema makes the export unreadable "
-    "(exit 2)",
-)
 def test_a_trigger_of_a_type_newer_than_tiggy_is_drift_with_a_warning(imported, tmp_path):
     def add_new_kind_of_trigger(version):
         version["trigger"].append(
@@ -572,7 +565,6 @@ def test_a_difference_names_the_field_as_the_spec_spells_it(case, imported, tmp_
     assert spec_spelling in detail and export_spelling not in detail, detail
 
 
-@pytest.mark.xfail(strict=True, reason="bug: one difference is summed up as '1 differences'")
 def test_one_difference_is_counted_in_the_singular(imported, tmp_path):
     def pause(version):
         named(version, "tag", "Meta - Pixel - Purchase")["paused"] = True
@@ -582,11 +574,6 @@ def test_one_difference_is_counted_in_the_singular(imported, tmp_path):
     assert result.out.splitlines()[-1].startswith("1 difference between "), result
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="bug: container features are read-only in the Tag Manager API, yet a flag Google flips fails "
-    "the drift gate with a difference the repo can't apply",
-)
 def test_a_feature_google_turns_on_for_the_container_is_not_drift(imported, tmp_path):
     spec = imported(ANALYTICS)
     live = load_export(ANALYTICS)

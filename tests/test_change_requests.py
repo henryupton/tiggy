@@ -635,7 +635,32 @@ def test_a_misspelt_consent_status_is_refused_where_it_is_written(imported):
     relpath = path.relative_to(spec).as_posix()
 
     line = line_of(spec, relpath, "consent_status: needed")
-    refused(spec, f"{relpath}:{line}: consent_status: 'needed' is not one of NOT_SET, NOT_NEEDED, NEEDED")
+    refused(spec, f"{relpath}:{line}: consent_status: needed is the API's spelling; a spec writes NEEDED")
+
+
+def test_an_upper_case_consent_status_typo_warns_and_fails_strict(imported):
+    """Shaped like a value GTM added after Tiggy's schema, so it passes through, but never quietly."""
+    spec = imported(MARKETING)
+    tag = "Google Ads - Conversion Linker"
+    edit_spec(
+        spec,
+        fragment_of(spec, "tags", tag),
+        lambda t: edit_entry(t, tag, "consent_status: NOT_SET", "consent_status: NEDED"),
+    )
+
+    code, found, _ = findings(spec)
+    strict = run_tiggy("validate", spec, "--strict")
+
+    assert code == 0
+    assert [(f["rule"], f["name"], f["message"]) for f in found if f["rule"] == "unmodelled-enum"] == [
+        (
+            "unmodelled-enum",
+            tag,
+            "consentSettings.consentStatus NEDED isn't in Tiggy's copy of GTM's API schema (did you mean "
+            '"NEEDED"?); it is kept as-is',
+        )
+    ]
+    assert strict.code == 1, str(strict)
 
 
 # 4. Rename a variable everywhere it is referenced.
@@ -769,11 +794,11 @@ def _comment_a_fragment(spec: Path) -> None:
     )
 
 
-def _split_out_the_version(spec: Path) -> None:
+def _split_out_the_container(spec: Path) -> None:
     text = (spec / "container.yml").read_bytes().decode("utf-8")
-    start, end = text.index("version:\n"), text.index("built_in_variables:\n")
+    start, end = text.index("container:\n"), text.index("built_in_variables:\n")
     (spec / "container.yml").write_bytes((text[:start] + text[end:]).encode("utf-8"))
-    (spec / "version.yml").write_bytes(f"tiggy: 1\n{text[start:end]}".encode("utf-8"))
+    (spec / "settings.yml").write_bytes(f"tiggy: 1\n{text[start:end]}".encode("utf-8"))
 
 
 def _split_built_ins_across_files(spec: Path) -> None:
@@ -795,15 +820,9 @@ MOVES = {
     "fragment-renamed-yaml": _rename_a_fragment,
     "payload-code-moved": _move_the_payload_code,
     "fragment-commented": _comment_a_fragment,
-    "version-split-out": _split_out_the_version,
+    "container-split-out": _split_out_the_container,
     "built-ins-split-across-files": _split_built_ins_across_files,
 }
-BUILT_IN_ORDER = pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="bug: export lists built-in variables in the order their fragments are read, so re-importing a "
-    "spec whose built-ins are split across files reorders them in container.yml",
-)
 
 
 @pytest.mark.parametrize("move", MOVES.values(), ids=MOVES.keys())
@@ -817,13 +836,7 @@ def test_moving_objects_between_files_is_not_a_change(imported, move: Callable[[
     assert (checked.code, checked.err) == (0, ""), str(checked)
 
 
-REIMPORT_MOVES = [
-    pytest.param(move, id=name, marks=[BUILT_IN_ORDER] if name == "built-ins-split-across-files" else [])
-    for name, move in MOVES.items()
-]
-
-
-@pytest.mark.parametrize("move", REIMPORT_MOVES)
+@pytest.mark.parametrize("move", MOVES.values(), ids=MOVES.keys())
 def test_a_rearranged_spec_reimports_as_it_was_imported(
     imported, tmp_path: Path, move: Callable[[Path], None]
 ):
@@ -1075,7 +1088,6 @@ def test_deleting_a_tag_something_else_names_is_caught(
 # Output wording seen on these requests.
 
 
-@pytest.mark.xfail(strict=True, reason="bug: import --check reports a single change as '1 differences'")
 def test_one_change_reads_as_one_difference(imported, tmp_path: Path):
     spec = imported(MARKETING)
     delete_tag(spec, "Microsoft Ads - UET purchase")
@@ -1084,9 +1096,6 @@ def test_one_change_reads_as_one_difference(imported, tmp_path: Path):
     assert result.out.splitlines()[-1] == f"1 difference between {MARKETING} and {spec}"
 
 
-@pytest.mark.xfail(
-    strict=True, reason="bug: validate and export report a single spec problem as '1 problems'"
-)
 def test_one_problem_reads_as_one_problem(imported):
     spec = imported(ANALYTICS)
     replace_in_spec(

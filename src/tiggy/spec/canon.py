@@ -1,8 +1,8 @@
 """Container equivalence: equal unless something other than GTM-assigned identity differs.
 
-`canon` drops identity and bookkeeping, rewrites every ID reference to what it refers to, and keys each
-collection by name. Two containers are equivalent exactly when their canons are equal. Collections are
-the only unordered part, because GTM orders them by the IDs this deliberately ignores.
+`canon` drops identity, bookkeeping and read-only state, rewrites every ID reference to what it refers
+to, and keys each collection by name. Two containers are equivalent exactly when their canons are equal.
+Collections are the only unordered part, because GTM orders them by the IDs this deliberately ignores.
 """
 
 import json
@@ -132,7 +132,7 @@ class _Canon:
         out: dict[str, Any] = {}
         for key, value in data.items():
             f = roles.get(key)
-            if f is not None and f.role is Role.DROPPED:
+            if f is not None and f.role in (Role.DROPPED, Role.ASSERTED):
                 continue
             if f is None or value is None:
                 out[key] = value

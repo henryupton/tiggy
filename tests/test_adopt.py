@@ -9,7 +9,6 @@ re-import byte for byte. Parametrised over ALL_EXPORTS, so $TIGGY_EXTRA_EXPORTS 
 import hashlib
 import json
 import os
-import re
 import stat
 from collections import Counter
 from pathlib import Path
@@ -303,14 +302,7 @@ def test_a_refused_adoption_leaves_nothing_behind(target: str, broken, tmp_path:
     [
         "existing-empty-directory",
         "new-directory",
-        pytest.param(
-            "new-directory-under-missing-parents",
-            marks=pytest.mark.xfail(
-                strict=True,
-                reason="bug: _commit_new creates the target's missing parents before staging and never "
-                "removes them, so a refusal or Ctrl-C after staging leaves empty directories behind",
-            ),
-        ),
+        "new-directory-under-missing-parents",
     ],
 )
 def test_an_adoption_stopped_after_staging_leaves_nothing_behind(
@@ -354,8 +346,8 @@ def test_an_adoption_stopped_after_staging_leaves_nothing_behind(
 
 
 def test_a_published_version_and_a_workspace_export_adopt_the_same_way(tmp_path: Path):
-    """Versions > Export and Admin > Export Container give the same objects; only the spec's `version:`
-    block, the published version's name and description, tells them apart."""
+    """Versions > Export and Admin > Export Container give the same objects. Only a published version has
+    a name and description, which label the publish rather than configure the container."""
     published = load_export(WEB_ANALYTICS)
     workspace = _as_workspace_export(published)
     collections = set(COLLECTION_LABELS) | {"builtInVariable", "container"}
@@ -363,6 +355,7 @@ def test_a_published_version_and_a_workspace_export_adopt_the_same_way(tmp_path:
     assert set(workspace["containerVersion"]) - collections == set(marketing) - collections, (
         "not shaped like the committed workspace export"
     )
+    assert {"name", "description"} <= set(published["containerVersion"])
     sources = {"published": WEB_ANALYTICS, "workspace": write_export(workspace, tmp_path / "workspace.json")}
 
     specs = {}
@@ -373,31 +366,15 @@ def test_a_published_version_and_a_workspace_export_adopt_the_same_way(tmp_path:
         plan = run_tiggy("import", source, specs[kind], "--check")
         assert plan.code == 0, str(plan)
 
-    from_published, from_workspace = _files(specs["published"]), _files(specs["workspace"])
-    assert sorted(from_published) == sorted(from_workspace)
-    assert [p for p in from_published if from_published[p] != from_workspace[p]] == ["container.yml"]
-    block = re.compile(r"^version:\n(?:  .*\n)+", re.MULTILINE)
-    container_yml = from_published["container.yml"].decode("utf-8")
-    (version_block,) = block.findall(container_yml)
-    assert block.sub("", container_yml) == from_workspace["container.yml"].decode("utf-8")
-    name, description = published["containerVersion"]["name"], published["containerVersion"]["description"]
-    assert version_block == f"version:\n  name: {name}\n  description: '{description}'\n"
-
+    assert _files(specs["published"]) == _files(specs["workspace"])
     (code_a, report_a), (code_b, report_b) = _validate(specs["published"]), _validate(specs["workspace"])
     assert (code_a, _findings(report_a)) == (code_b, _findings(report_b)) == (0, Counter())
 
 
-def test_switching_the_drift_gate_to_workspace_exports_shows_only_the_version_name_and_description(
-    imported, tmp_path: Path
-):
-    """A spec adopted from a published version keeps that version's name and description, so checking a
-    workspace export of the same container against it names those two and nothing else."""
+def test_switching_the_drift_gate_to_workspace_exports_changes_nothing(imported, tmp_path: Path):
+    """A spec adopted from a published version, checked against a workspace export of the same container."""
     spec = imported(WEB_ANALYTICS)
     workspace = write_export(_as_workspace_export(load_export(WEB_ANALYTICS)), tmp_path / "workspace.json")
     result = run_tiggy("import", workspace, spec, "--check")
-    assert result.code == 1, str(result)
-    assert scrub(result.out, workspace, spec) == (
-        "≠ description: only in the spec\n"
-        "≠ name: only in the spec\n"
-        "2 differences between <path1> and <path2>\n"
-    )
+    assert (result.code, result.err) == (0, ""), str(result)
+    assert scrub(result.out, workspace, spec) == "<path2> is equivalent to <path1>\n"

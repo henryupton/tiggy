@@ -1,4 +1,4 @@
-Example - Analytics: 11 tags, 6 triggers, 30 variables, 2 templates
+Example - Analytics (GTM-TEST001): 11 tags, 6 triggers, 30 variables, 2 templates
 
 ✗ tag "GA4 - file_download"  folders/ga4/tags.yml:3
     eventSettingsTable[3].parameterValue: {{DLV - event_attributes.licence_type}} is not a variable or an enabled built-in (did you mean "DLV - event_attributes.license_type"?)  [unknown-variable]

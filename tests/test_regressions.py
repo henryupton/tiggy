@@ -9,14 +9,12 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 import time
 import unicodedata
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-import pydantic
 import pytest
 import yaml
 from click.testing import CliRunner
@@ -46,7 +44,6 @@ POST_HTML = "<script>\n  window.postPayload('https://collect.example.com/e');\n<
 LOCK = ".tiggy-import.lock"
 
 POSIX = pytest.mark.skipif(os.name == "nt", reason="POSIX file modes, devices and file names")
-PYDANTIC_BEFORE_2_13 = tuple(int(part) for part in pydantic.VERSION.split(".")[:2]) < (2, 13)
 
 
 # The probe container and helpers
@@ -175,12 +172,6 @@ def test_an_export_that_isnt_utf8_is_refused(tmp_path: Path):
     assert result.err.rstrip().endswith("export.json: not UTF-8 JSON")
 
 
-@pytest.mark.xfail(
-    PYDANTIC_BEFORE_2_13,
-    strict=True,
-    reason="bug: before pydantic 2.13 (pyproject allows 2.9) validate passes tag_firing_option as unmodelled "
-    "and import calls it a bug in Tiggy, and live_only is reported as liveOnly missing from the export",
-)
 @pytest.mark.parametrize("key", ["live_only", "tag_firing_option"])
 def test_a_key_spelled_like_a_python_field_name_is_refused_by_import_and_validate(tmp_path: Path, key: str):
     source = changed(tmp_path, lambda v: tag(v).update({key: True}))
@@ -234,6 +225,24 @@ def test_fields_outside_the_container_are_named_on_import_and_check(tmp_path: Pa
     assert imported.err.startswith("note: ") and imported.err.rstrip().endswith(note)
     assert checked.code == 0, checked
     assert checked.err.rstrip().endswith(note)
+
+
+@pytest.mark.parametrize(
+    "section, key",
+    [("version", "name"), ("version", "description"), ("container", "features"), ("container", "tag_ids")],
+)
+def test_a_field_gtm_sets_is_refused_in_a_spec_saying_why(spec: Path, section: str, key: str):
+    if section == "version":
+        replace_in_spec(spec, "container.yml", "container:\n", f"version:\n  {key}: x\ncontainer:\n")
+    else:
+        replace_in_spec(
+            spec, "container.yml", "  public_id: GTM-TEST001\n", f"  public_id: GTM-TEST001\n  {key}: x\n"
+        )
+
+    result = run_tiggy("validate", spec)
+
+    assert result.code == 1, result
+    assert f"{key} isn't written in a spec: GTM sets it, and Tiggy compares without it" in result.out
 
 
 def test_a_null_collection_is_refused_cleanly(tmp_path: Path):
@@ -939,7 +948,7 @@ def test_a_built_in_variable_in_a_spec_needs_its_name(spec: Path):
     assert result.code == 1, result
     assert result.out.splitlines() == [
         f"✗ container.yml:{line}: a built-in variable needs its GTM name too, such as `name: Page URL`",
-        "1 problems in the spec",
+        "1 problem in the spec",
     ]
 
 
@@ -961,7 +970,7 @@ def test_a_broken_fragment_doesnt_cascade_into_false_problems(
     assert result.code == 1, result
     lines = result.out.splitlines()
     assert len(lines) == 2 and lines[0].startswith(expected), result
-    assert lines[1] == "1 problems in the spec"
+    assert lines[1] == "1 problem in the spec"
 
 
 def test_a_dangling_trigger_id_never_starts_resolving(spec: Path):
@@ -1229,10 +1238,6 @@ def test_control_characters_in_names_are_escaped_in_every_output_path(tmp_path: 
 
 
 @POSIX
-@pytest.mark.xfail(
-    strict=True,
-    reason="bug: SOURCE and SPEC_DIR reach import's summary and --check's verdict lines unescaped",
-)
 def test_control_characters_in_paths_are_escaped_in_import_and_check_summaries(tmp_path: Path, probe_export):
     spec = tmp_path / "spec\a\nforged"
 
@@ -1313,11 +1318,6 @@ def test_export_o_writes_through_a_link_to_its_target(tmp_path: Path, spec: Path
 
 
 @POSIX
-@pytest.mark.xfail(
-    sys.platform.startswith("linux"),
-    strict=True,
-    reason="bug: on Linux /dev/stdout resolves through /proc/self/fd, so -o replaces a path, not stdout",
-)
 def test_export_o_dev_stdout_writes_to_stdout(spec: Path):
     result = run_tiggy("export", spec, "-o", "/dev/stdout")
 
@@ -1433,7 +1433,8 @@ def test_a_container_at_real_scale_imports_in_under_20_seconds_and_validates_in_
     assert import_seconds < 20, f"import took {import_seconds:.1f}s"
     assert validated.code == 0, validated
     assert (
-        validated.out.splitlines()[0] == "Example - Analytics at scale: 400 tags, 300 triggers, 700 variables"
+        validated.out.splitlines()[0]
+        == "Example - Analytics at scale (GTM-TEST001): 400 tags, 300 triggers, 700 variables"
     )
     assert validated.out.splitlines()[-1].startswith("0 errors, ")
     assert validate_seconds < 10, f"validate took {validate_seconds:.1f}s"

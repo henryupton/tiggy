@@ -489,12 +489,6 @@ def test_outside_a_git_repo_the_hint_names_every_code_extension(tmp_path: Path):
     sys.platform not in ("darwin", "win32"),
     reason="elsewhere a non-UTF-8 locale changes how the spec path itself is read",
 )
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason="bug: the exclude hint decodes `git rev-parse --show-prefix` with the locale's encoding, so "
-    "under a non-UTF-8 one (Windows without UTF-8 mode) import writes the spec, then exits 2",
-)
 def test_the_hint_survives_a_non_utf8_locale(tmp_path: Path, git: Callable[..., bytes]):
     repo = tmp_path / "repo"
     repo.mkdir()

@@ -1,4 +1,5 @@
 import functools
+import io
 import json
 import os
 import re
@@ -17,12 +18,13 @@ from tiggy.checks import Severity
 from tiggy.graph import ContainerGraph, Kind, Node
 from tiggy.gtm.resources import BuiltInVariable
 from tiggy.io import export
-from tiggy.report import printable
+from tiggy.report import plural, printable
 from tiggy.spec.compiler import Compiled, compile_spec
 from tiggy.spec.importer import ImportError_, check, import_version, umask
 from tiggy.spec.loader import load_spec, looks_like_spec
 from tiggy.spec.problems import Problem, SpecError
 
+CLOSED_STDOUT = "stdout is closed, so there's nowhere to write"
 SPEC_KEYS = {
     Kind.TAG: "tags",
     Kind.TRIGGER: "triggers",
@@ -76,6 +78,9 @@ def main() -> None:
     """The `tiggy` command. A closed pipe ends it with 141, as for any Unix tool, click's own output too."""
     if hasattr(signal, "SIGPIPE"):
         signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, io.TextIOWrapper):  # so ✗ on a cp1252 pipe is \u2717, not a crash
+            stream.reconfigure(errors="backslashreplace")
     try:
         cli.main(prog_name="tiggy")
     except BrokenPipeError:
@@ -99,7 +104,7 @@ def _out(text: str | bytes, nl: bool = True) -> None:
     Bytes go out exactly, without the line endings a Windows text stream would add.
     """
     if sys.stdout is None:
-        raise InputError("stdout is closed, so there's nowhere to write")
+        raise InputError(CLOSED_STDOUT)
     try:
         click.echo(text, nl=nl)
         sys.stdout.flush()
@@ -120,8 +125,11 @@ def _err(message: str) -> None:
 
 @click.group(no_args_is_help=True)
 @click.version_option(__version__, prog_name="tiggy")
-def cli() -> None:
+@click.pass_context
+def cli(ctx: click.Context) -> None:
     """Declarative Google Tag Manager."""
+    if os.environ.get("NO_COLOR"):  # https://no-color.org
+        ctx.color = False
 
 
 @cli.command()
@@ -141,7 +149,8 @@ def validate(source: Path, fmt: str, strict: bool) -> None:
         compiled = _compile(source, fmt)
         files = [str(w) for w in compiled.warnings]
         labels = {(Kind.GTAG_CONFIG, i): label for i, label in compiled.labels.items()}
-        graph = ContainerGraph(compiled.version, labels)
+        unversioned = compiled.version.model_copy(update={"container_version_id": None})  # a spec has none
+        graph = ContainerGraph(unversioned, labels)
         locations = _locations(graph, compiled)
     else:
         read = _read_export(source)
@@ -174,12 +183,16 @@ def import_(source: Path, spec_dir: Path, check_only: bool) -> None:
     The spec is proven to compile back to the same container before it is written. With
     --check, nothing is written: SOURCE is compared with the spec already in SPEC_DIR.
     """
+    if sys.stdout is None and not check_only:  # refused before anything is written, not after
+        raise InputError(CLOSED_STDOUT)
     read = _read_export(source)
     ignored = read.outside_container
     if ignored:
         _err(
             printable(f"note: {source} has fields outside the container, not imported: {', '.join(ignored)}")
         )
+    for finding in checks.unmodelled_enums(ContainerGraph(read.export.container_version)):
+        _err(f"{click.style('!', fg='yellow')} {printable(f'{finding.node}: {finding.message}')}")
     if check_only:
         _require_spec(spec_dir)
         try:
@@ -193,9 +206,10 @@ def import_(source: Path, spec_dir: Path, check_only: bool) -> None:
         if differences:
             for line in differences:
                 _out(f"{click.style('≠', fg='yellow')} {printable(line)}")
-            _out(click.style(f"{len(differences)} differences between {source} and {spec_dir}", fg="yellow"))
+            summary = f"{plural(len(differences), 'difference')} between {source} and {spec_dir}"
+            _out(click.style(printable(summary), fg="yellow"))
             raise SystemExit(1)
-        _out(click.style(f"{spec_dir} is equivalent to {source}", fg="green"))
+        _out(click.style(printable(f"{spec_dir} is equivalent to {source}"), fg="green"))
         return
     try:
         result = import_version(read.raw_version, spec_dir)
@@ -206,7 +220,8 @@ def import_(source: Path, spec_dir: Path, check_only: bool) -> None:
     counts = ", ".join(f"{n} {key.replace('_', ' ')}" for key, n in result.counts.items())
     container = read.export.container_version.container
     name = container.name if container and container.name else "container"
-    _out(f"Imported {click.style(printable(name), bold=True)} into {spec_dir}: {counts or 'nothing'}")
+    into = printable(f"{spec_dir}: {counts or 'nothing'}")
+    _out(f"Imported {click.style(printable(name), bold=True)} into {into}")
     _out(f"  {len(result.fragments)} YAML files, {len(result.sidecars)} code files")
     _out(click.style("  verified: the spec compiles back to the same container", fg="green"))
     if result.sidecars:
@@ -244,16 +259,12 @@ def export_(spec_dir: Path, output: str | None) -> None:
 def _write(path: Path, data: bytes) -> None:
     """Write a file whole or not at all: a failed write leaves whatever was there before."""
     try:
+        if _device(path):  # nothing to replace
+            path.write_bytes(data)
+            return
         path = path.resolve()  # through a link to its target, rather than replacing the link
-        if path.exists() and not path.is_file():  # a FIFO or device: nothing to replace
-            path.write_bytes(data)
-            return
         mode = path.stat().st_mode & 0o7777 if path.exists() else 0o666 & ~umask()
-        try:
-            fd, staging = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
-        except OSError:  # nowhere to stage it, such as /dev/fd for /dev/stdout
-            path.write_bytes(data)
-            return
+        fd, staging = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
         try:
             with os.fdopen(fd, "wb") as f:
                 f.write(data)
@@ -264,6 +275,13 @@ def _write(path: Path, data: bytes) -> None:
             raise
     except OSError as e:
         raise InputError(f"can't write {path}: {e.strerror or e}") from e
+
+
+def _device(path: Path) -> bool:
+    """A FIFO, a device, or /dev/stdout and the like, which Linux resolves through /proc to a file."""
+    if os.name != "nt" and path.absolute().parts[1:2] in (("dev",), ("proc",)):
+        return True
+    return path.exists() and not path.is_file()
 
 
 def _problems(error: SpecError) -> str:
@@ -317,7 +335,7 @@ def _print_problems(error: SpecError, fmt: str, err: bool = False) -> None:
         return
     for problem in error.problems:
         say(f"{click.style('✗', fg='red')} {printable(str(problem))}")
-    say(click.style(f"{len(error.problems)} problems in the spec", fg="red"))
+    say(click.style(f"{plural(len(error.problems), 'problem')} in the spec", fg="red"))
 
 
 def _print_warnings(warnings: list[Problem]) -> None:
@@ -338,12 +356,11 @@ def _precommit_hint(spec_dir: Path) -> str:
 def _repo_relative(path: Path) -> str | None:
     """The spec's path within its git repository, spelled the way git spells it."""
     try:
-        prefix = subprocess.run(
+        out = subprocess.run(
             ["git", "-C", str(path.resolve()), "rev-parse", "--show-prefix"],
             capture_output=True,
-            text=True,
             check=True,
-        ).stdout.strip()
+        ).stdout
     except (OSError, subprocess.CalledProcessError):
         return None
-    return prefix.rstrip("/") or "."
+    return os.fsdecode(out).strip().rstrip("/") or "."  # git prints the path's bytes, not the locale's

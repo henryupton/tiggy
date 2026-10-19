@@ -40,7 +40,7 @@ def printable(text: str) -> str:
     return "".join(c if c.isprintable() else c.encode("unicode_escape").decode() for c in text)
 
 
-def _plural(n: int, word: str) -> str:
+def plural(n: int, word: str) -> str:
     return f"{n} {word}{'' if n == 1 else 's'}"
 
 
@@ -52,10 +52,12 @@ def text(
 ) -> str:
     """`files` are warnings about the spec's files rather than its objects, already located."""
     meta = _container(graph)
-    counts = ", ".join(_plural(n, k) for k, n in _counts(graph).items())
+    counts = ", ".join(plural(n, k) for k, n in _counts(graph).items())
     title = meta["name"] or "Container"
     if meta["publicId"]:
-        title += f" ({meta['publicId']}), version {meta['version']}"
+        title += f" ({meta['publicId']})"
+    if meta["version"]:
+        title += f", version {meta['version']}"
     lines = [click.style(printable(title), bold=True) + (f": {counts}" if counts else ""), ""]
     locations = locations or {}
     by_node: dict[Node, list[Finding]] = defaultdict(list)
@@ -74,7 +76,7 @@ def text(
     tally["warnings"] += len(files or [])
     if findings or files:
         lines.append("")
-    summary = f"{_plural(tally['errors'], 'error')}, {_plural(tally['warnings'], 'warning')}"
+    summary = f"{plural(tally['errors'], 'error')}, {plural(tally['warnings'], 'warning')}"
     lines.append(
         click.style(summary, fg="red" if tally["errors"] else "yellow" if tally["warnings"] else "green")
     )

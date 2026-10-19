@@ -13,11 +13,12 @@ from functools import cache
 from typing import Annotated, Any, Union, get_args, get_origin
 
 from tiggy.gtm import resources as r
-from tiggy.gtm.base import GtmModel
+from tiggy.gtm.base import GtmModel, unwrap
 
 
 class Role(Enum):
-    DROPPED = auto()  # GTM-assigned identity or bookkeeping
+    DROPPED = auto()  # GTM-assigned identity, bookkeeping or read-only state
+    ASSERTED = auto()  # GTM-assigned identity a spec records, to check it is compared with its own container
     COLLECTION = auto()  # a ContainerVersion list that becomes a top-level spec key
     CONTAINER = auto()  # ContainerVersion.container, the top-level `container` key
     TRIGGER_REFS = auto()  # trigger IDs, written as trigger refs
@@ -57,7 +58,8 @@ OWN_ID = {
 DROPPED: dict[type[GtmModel], set[str]] = {
     **{model: BOOKKEEPING | {own} for model, own in OWN_ID.items()},
     r.BuiltInVariable: BOOKKEEPING,
-    r.Container: {"accountId", "containerId", "publicId", "tagIds", "path", "fingerprint", "tagManagerUrl"},
+    # features are read-only in the API, and a version's name and description label a publish
+    r.Container: {"accountId", "containerId", "tagIds", "path", "fingerprint", "tagManagerUrl", "features"},
     r.ContainerVersion: {
         "accountId",
         "containerId",
@@ -65,8 +67,11 @@ DROPPED: dict[type[GtmModel], set[str]] = {
         "path",
         "fingerprint",
         "tagManagerUrl",
+        "name",
+        "description",
     },
 }
+ASSERTED_IDS = {(r.Container, "publicId")}
 
 # ContainerVersion field -> (spec key, model, identity key in the spec).
 COLLECTIONS: dict[str, tuple[str, type[GtmModel], str]] = {
@@ -110,8 +115,8 @@ CODE_FIELDS = {(r.CustomTemplate, "templateData")}
 
 # Spec key order per model; a spec-only key such as gtag configs' `label` comes first where listed.
 KEY_ORDER: dict[type[GtmModel], list[str]] = {
-    r.Container: ["name", "notes", "usage_context", "domain_name", "tagging_server_urls", "features"],
-    r.ContainerVersion: ["name", "description", "deleted"],
+    r.Container: ["name", "public_id", "notes", "usage_context", "domain_name", "tagging_server_urls"],
+    r.ContainerVersion: ["deleted"],
     r.BuiltInVariable: ["type", "name"],
     r.Folder: ["name", "notes"],
     r.CustomTemplate: ["name", "gallery_reference", "template_data"],
@@ -204,24 +209,6 @@ KEY_ORDER: dict[type[GtmModel], list[str]] = {
         "convert_to_boolean",
         "convert_to_number",
     ],
-    r.ContainerFeatures: sorted(  # every flag, alphabetically
-        [
-            "support_built_in_variables",
-            "support_clients",
-            "support_environments",
-            "support_folders",
-            "support_gtag_configs",
-            "support_tags",
-            "support_templates",
-            "support_transformations",
-            "support_triggers",
-            "support_user_permissions",
-            "support_variables",
-            "support_versions",
-            "support_workspaces",
-            "support_zones",
-        ]
-    ),
 }
 SPEC_ONLY_KEYS = {r.GtagConfig: {"label"}}
 UNMODELLED = "unmodelled"
@@ -229,15 +216,6 @@ UNMODELLED = "unmodelled"
 
 def snake(name: str) -> str:
     return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
-
-
-def _unwrap(annotation: Any) -> Any:
-    if get_origin(annotation) is Annotated:  # bounds such as Int32 are pydantic's to check
-        return _unwrap(get_args(annotation)[0])
-    if get_origin(annotation) in (Union, types.UnionType):
-        args = [a for a in get_args(annotation) if a is not type(None)]
-        return _unwrap(args[0]) if len(args) == 1 else annotation
-    return annotation
 
 
 def _bounds(annotation: Any) -> tuple[int | None, int | None]:
@@ -261,10 +239,12 @@ def fields(model: type[GtmModel]) -> tuple[Field, ...]:
     """Every field of a model with its role, in spec key order (dropped fields last)."""
     placed: list[Field] = []
     for info in model.model_fields.values():
-        alias, annotation = info.alias, _unwrap(info.annotation)
-        inner = _unwrap(get_args(annotation)[0]) if get_origin(annotation) is list else None
+        alias, annotation = info.alias, unwrap(info.annotation)
+        inner = unwrap(get_args(annotation)[0]) if get_origin(annotation) is list else None
         if alias in DROPPED.get(model, ()):
             role, key = Role.DROPPED, snake(alias)
+        elif (model, alias) in ASSERTED_IDS:
+            role, key = Role.ASSERTED, snake(alias)
         elif model is r.ContainerVersion and alias in COLLECTIONS:
             role, key = Role.COLLECTION, COLLECTIONS[alias][0]
         elif model is r.ContainerVersion and alias == "container":

@@ -1,27 +1,13 @@
 tiggy: 1
 container:
   name: Example - Server
+  public_id: GTM-TEST003
   usage_context:
     - SERVER
-  features:
-    support_built_in_variables: true
-    support_clients: true
-    support_environments: true
-    support_folders: true
-    support_gtag_configs: false
-    support_tags: true
-    support_templates: true
-    support_transformations: true
-    support_triggers: true
-    support_user_permissions: true
-    support_variables: true
-    support_versions: true
-    support_workspaces: true
-    support_zones: true
 built_in_variables:
-  - type: EVENT_NAME
-    name: Event Name
   - type: CLIENT_NAME
     name: Client Name
+  - type: EVENT_NAME
+    name: Event Name
   - type: REQUEST_PATH
     name: Request Path
