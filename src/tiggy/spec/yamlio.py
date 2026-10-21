@@ -413,6 +413,20 @@ def render(tree: dict[str, Any]) -> str:
     raise YamlError("the YAML written doesn't load back to the same value; this is a bug in Tiggy")
 
 
+def lines(value: Any) -> list[str]:
+    """A value on its own as block YAML, the lines `render` writes for it under a key: a mapping's entries,
+    a sequence's items, or a scalar (a literal block's body keeping its indent)."""
+    head, *body = render({"v": value}).splitlines()
+    if head == "v:":
+        return [line[2:] for line in body]
+    return [head.removeprefix("v: "), *body]
+
+
+def one_line(value: Any) -> str:
+    """A value as the emitter writes it on one line: a scalar, or a flow mapping or sequence of them."""
+    return _inline(value)
+
+
 def _depth(value: Any) -> int:
     if isinstance(value, dict):
         return 1 + max(map(_depth, value.values()), default=0)

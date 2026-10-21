@@ -96,17 +96,31 @@ approximated.
 
 `--check` writes nothing and lists every difference between the export and an existing spec, which makes it a
 drift gate for CI. Each names the field as the spec spells it and the line to edit, relative to the working
-directory when the spec is inside it. A change to a code file is at the line in that file where it starts, and
-a long file shows a window into it there:
+directory when the spec is inside it, and is marked as applying the spec would make it: `+` for what only the
+spec has, `-` for what only the container has, `~` for what both have, changed or moved. A table row, filter
+condition or teardown tag only one side has, and a changed value that is a mapping or list, shows below its line
+as the spec writes it, the container's lines marked `-` and the spec's `+`; a field or parameter only one side
+has reads `missing from`, without its value. A change to a code file is at the line in that file where it starts,
+and a long file shows a window into it there:
 
 ```
-≠ tags 'GA4 - sign_up': paused (missing from the spec)  gtm/web/folders/ga4/tags.yml:45
-≠ tags 'GA4 - sign_up': parameter.eventName ('signup' in the container, 'sign_up' in the spec)  gtm/web/folders/ga4/tags.yml:62
-2 differences between live.json and gtm/web
+- tags 'GA4 - sign_up': paused (missing from the spec)  gtm/web/folders/ga4/tags.yml:45
++ tags 'GA4 - sign_up': parameter.eventSettingsTable[2] (only in the spec)  gtm/web/folders/ga4/tags.yml:62
+    + parameter: signup_source
+    + parameterValue: '{{DLV - event_attributes.signup_source}}'
+~ tags 'GA4 - sign_up': parameter.eventName ('signup' in the container, 'sign_up' in the spec)  gtm/web/folders/ga4/tags.yml:64
+3 differences between live.json and gtm/web
 ```
+
+Where a table gains or loses rows, a row in place of one it shares at least half its cells with is read as that
+row changed, so a renamed cell is one `~` at the cell rather than a row gone and another new. Rows pair only
+between the same unchanged rows and in order, so a row both moved and renamed is still one gone and one new.
+Filter conditions and teardown tags pair the same way. On a terminal the markers and each side's values are
+coloured (the container's red, the spec's green); `NO_COLOR` or a pipe prints the same characters without colour.
 
 `--format json` gives each difference with its path, the values its message shows and its location;
-`--format github` writes workflow commands, so in GitHub Actions each shows on the pull request's diff.
+`--format github` writes workflow commands, so in GitHub Actions each shows on the pull request's diff, any
+block in its annotation.
 
 Only differences in meaning count. A tag's parameters in another order (each key is unique), its triggers in
 another order (any of them fires it) and an empty list against none are the same container; table rows and filter

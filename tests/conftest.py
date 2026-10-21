@@ -6,11 +6,12 @@ Exports to test against, as lists of paths (parametrize with `ids=export_id`):
     EXTRA_EXPORTS        real exports from $TIGGY_EXTRA_EXPORTS, a directory outside the repo
     ALL_EXPORTS          all of the above
 
-Helpers: run_tiggy, base_env, scrub, load_export, write_export, edit_spec, replace_in_spec, fragment_of,
-line_of.
+Helpers: run_tiggy, base_env, scrub, drift_reported, load_export, write_export, edit_spec, replace_in_spec,
+fragment_of, line_of.
 Fixtures: tiggy (run_tiggy), imported, golden (with --update-goldens).
 """
 
+import ast
 import functools
 import hashlib
 import json
@@ -231,6 +232,35 @@ def unread_note(export: str | os.PathLike) -> str:
 
 
 FINDING_LINE = re.compile(r'[✗⚠] [a-z][a-z -]* "')
+DRIFT_LINE = re.compile(r"([+~-]) (\w+)(?: ('(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"))?: (.*)")
+BLOCK_LINE = re.compile(r"    [+-]( .*)?")
+
+
+@dataclass(frozen=True)
+class Drift:
+    """A difference `import --check` printed: its marker, object, the rest of its line, the lines below."""
+
+    marker: str
+    kind: str
+    name: str | None
+    detail: str
+    block: list[str] = field(default_factory=list)
+
+
+def drift_reported(result: Result) -> list[Drift]:
+    """`import --check`'s differences, and that its summary counts them; any other line fails."""
+    *lines, summary = result.out.splitlines()
+    found: list[Drift] = []
+    for line in lines:
+        if found and BLOCK_LINE.fullmatch(line):
+            found[-1].block.append(line)
+            continue
+        match = DRIFT_LINE.fullmatch(line)
+        assert match, f"not a difference in one object: {line!r}\n{result}"
+        name = None if match[3] is None else ast.literal_eval(match[3])
+        found.append(Drift(match[1], match[2], name, match[4]))
+    assert re.fullmatch(rf"{len(found)} differences? between .+ and .+", summary), result
+    return found
 
 
 def problems_reported(result: Result) -> list[str]:

@@ -22,6 +22,7 @@ import yaml
 
 from tests.conftest import (
     FIXTURES,
+    drift_reported,
     edit_spec,
     fragment_of,
     line_of,
@@ -292,18 +293,14 @@ def lands(spec: Path, expected: Path, strict: bool = True) -> None:
 
 
 def drift(spec: Path, export: Path) -> dict[tuple[str, str], list[str]]:
-    """What `import --check` says differs between the export and the spec, by (kind, name), unlocated."""
+    """What `import --check` says differs between the export and the spec, by (kind, name), unlocated, each
+    with its block's lines after it."""
     result = run_tiggy("import", export, spec, "--check")
     assert result.code == 1, str(result)
-    *lines, summary = result.out.splitlines()
     found = defaultdict(list)
-    for line in lines:
-        match = re.fullmatch(r"≠ (\w+) '(.+?)': (.+?)(?:  \S+:\d+)?", line)
-        assert match, f"unexpected --check line {line!r}\n{result}"
-        found[match[1], match[2]].append(match[3])
-    assert re.fullmatch(
-        rf"{len(lines)} differences? between {re.escape(str(export))} and {re.escape(str(spec))}", summary
-    )
+    for d in drift_reported(result):
+        found[d.kind, d.name].append("\n".join([re.sub(r"  \S+:\d+$", "", d.detail), *d.block]))
+    assert result.out.splitlines()[-1].endswith(f" between {export} and {spec}"), str(result)
     return dict(found)
 
 
@@ -530,7 +527,9 @@ def test_adding_a_brand_new_event_end_to_end(imported, tmp_path: Path):
         ("triggers", "CE - track_event - video_progress"): ["only in the spec"],
         ("tags", "GA4 - video_progress"): ["only in the spec"],
         ("tags", AMPLITUDE): [
-            f"parameter.eventProperties[{i}] ({json.dumps(amplitude_row(prop))} only in the spec)"
+            f"parameter.eventProperties[{i}] (only in the spec)\n"
+            f"    + name: {prop}\n"
+            f"    + value: '{amplitude_row(prop)['value']}'"
             for i, prop in enumerate(VIDEO_PROPERTIES, 24)
         ],
     }

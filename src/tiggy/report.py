@@ -5,14 +5,19 @@ reported beside the findings, as an error with rule `spec-problem` and no object
 """
 
 import json
+import re
+import uuid
 from collections import defaultdict
+from functools import partial
 from typing import Any
 
 import click
 
 from tiggy.checks import Finding, Severity
 from tiggy.graph import ContainerGraph, Kind, Node
-from tiggy.spec.diff import ABSENT, SIDES, Change, Diff, Op, Secret, shown, where
+from tiggy.secrets import SecretRef
+from tiggy.spec import yamlio
+from tiggy.spec.diff import ABSENT, SIDES, Change, Diff, Op, Secret, shown, where, written
 from tiggy.spec.problems import Problem, describe
 
 MARKS = {Severity.ERROR: ("✗", "red"), Severity.WARNING: ("⚠", "yellow")}
@@ -179,45 +184,140 @@ DRIFT_OPS = {
 }
 
 
-def message(change: Change, sides: tuple[str, str] = SIDES) -> str:
+MARKERS = {"+": "green", "-": "red", "~": "yellow"}
+PLAIN: dict[str, Any] = {}
+CONTAINER, SPEC = {"fg": "red"}, {"fg": "green"}  # each side's values
+Run = tuple[str, dict[str, Any]]  # some text and how click.style shows it
+
+
+def marker(change: Change) -> str:
+    """`+` for what applying the spec would add, `-` for what it would remove, `~` for what it changes."""
+    if change.op is Op.ONLY_RIGHT or change.members and not change.left:
+        return "+"
+    if change.op is Op.ONLY_LEFT or change.members and not change.right:
+        return "-"
+    return "~"
+
+
+def message(change: Change, sides: tuple[str, str] = SIDES, whole: bool = False) -> str:
     """A Change after its object's name: `parameter.eventName ('a' in the container, 'b' in the spec)`.
 
     A key on one side only reads `missing from`; a list item shows its value, since an index can't say
-    which item it is.
+    which item it is. A structured value shows in `blocks` instead, unless `whole`, as JSON's message has it.
     """
+    return "".join(text for text, _ in _runs(change, sides, whole))
+
+
+def _runs(change: Change, sides: tuple[str, str] = SIDES, whole: bool = False) -> list[Run]:
     left, right = sides
-    if change.unexplained:
-        return change.unexplained
+    if change.unexplained and not change.path:
+        return [(change.unexplained, PLAIN)]
     if not change.path:
-        return f"only in {left if change.op is Op.ONLY_LEFT else right}"
-    item = _item(change)
-    if change.op is Op.MOVED:
-        detail = f"at [{change.left}] in {left}, [{change.right}] in {right}"
+        return [(f"only in {left if change.op is Op.ONLY_LEFT else right}", PLAIN)]
+    blocked = not whole and bool(_shown_whole(change))
+    spelled = partial(_spelled, flow=not whole)
+    if change.unexplained:
+        detail = [(change.unexplained, PLAIN)]
+    elif change.op is Op.MOVED:
+        detail = [("at ", PLAIN), *_sides(f"[{change.left}]", f"[{change.right}]", sides)]
     elif change.window:
         w = change.window
-        detail = f"from line {w.line}, character {w.column}: {w.left!r} in {left}, {w.right!r} in {right}"
+        detail = [
+            (f"from line {w.line}, character {w.column}: ", PLAIN),
+            *_sides(repr(w.left), repr(w.right), sides),
+        ]
     elif change.members:
-        gone, new = (", ".join(map(_spelled, members)) for members in (change.left, change.right))
+        gone, new = (", ".join(map(spelled, members)) for members in (change.left, change.right))
         if gone and new:
-            detail = f"{gone} in {left}, {new} in {right}"
+            detail = _sides(gone, new, sides)
         else:
-            detail = f"{gone} only in {left}" if gone else f"{new} only in {right}"
-    elif change.op is Op.ONLY_LEFT:
-        detail = f"{_spelled(change.left)} only in {left}" if item else f"missing from {right}"
-    elif change.op is Op.ONLY_RIGHT:
-        detail = f"{_spelled(change.right)} only in {right}" if item else f"missing from {left}"
+            detail = [
+                (gone or new, CONTAINER if gone else SPEC),
+                (f" only in {left if gone else right}", PLAIN),
+            ]
+    elif change.op in (Op.ONLY_LEFT, Op.ONLY_RIGHT):
+        gone = change.op is Op.ONLY_LEFT
+        value, style, side = (change.left, CONTAINER, left) if gone else (change.right, SPEC, right)
+        if not _item(change):
+            detail = [(f"missing from {right if gone else left}", PLAIN)]
+        else:
+            detail = [] if blocked else [(spelled(value), style), (" ", PLAIN)]
+            detail.append((f"only in {side}", PLAIN))
+    elif blocked:
+        detail = [("changed", PLAIN)]
     else:
-        detail = f"{_spelled(change.left)} in {left}, {_spelled(change.right)} in {right}"
+        detail = _sides(spelled(change.left), spelled(change.right), sides)
     if change.default:
-        detail += "; GTM's default, unverified"
-    return f"{where(change.path)} ({detail})"
+        detail += [("; ", PLAIN), ("GTM's default, unverified", {"fg": "yellow"})]
+    return [(where(change.path), {"fg": "cyan"}), (" (", PLAIN), *detail, (")", PLAIN)]
+
+
+def _sides(gone: str, new: str, sides: tuple[str, str]) -> list[Run]:
+    return [(gone, CONTAINER), (f" in {sides[0]}, ", PLAIN), (new, SPEC), (f" in {sides[1]}", PLAIN)]
+
+
+def blocks(change: Change) -> list[tuple[str, str]]:
+    """The lines below a Change's own: each structured value it shows, as block YAML in spec spelling, each
+    line with its side's marker."""
+    return [
+        (mark, line) for mark, value in _shown_whole(change) for line in _yaml(value, change, mark == "+")
+    ]
+
+
+def _shown_whole(change: Change) -> list[tuple[str, Any]]:
+    """The sides a Change shows as blocks, by marker, the container's first: a list item's when structured,
+    and both of a change where either is."""
+    if change.unexplained or change.window or change.members or not change.path or change.op is Op.MOVED:
+        return []
+    if change.op is Op.CHANGED:
+        sides = [("-", change.left), ("+", change.right)]
+        return sides if any(_structured(value) for _, value in sides) else []
+    side = ("-", change.left) if change.op is Op.ONLY_LEFT else ("+", change.right)
+    return [side] if _item(change) and _structured(side[1]) else []
+
+
+def _structured(value: Any) -> bool:
+    return (
+        value is not ABSENT and not isinstance(value, yamlio.Flow) and isinstance(shown(value), dict | list)
+    )
+
+
+def _yaml(value: Any, change: Change, spec: bool) -> list[str]:
+    """`value` as a spec writes it, a secret as the spec's {$secret: name} or the container's <secret>."""
+    token, secrets = f"tiggysecret{uuid.uuid4().hex}n", []
+
+    def stand_in(secret: Secret) -> str:
+        secrets.append(secret)
+        return f"{token}{len(secrets) - 1}"
+
+    node = written(value, change.form, stand_in)
+    try:
+        found = yamlio.lines(node)
+    except yamlio.YamlError:  # nothing a spec could write either, such as a float in an unmodelled field
+        found = [json.dumps(node, ensure_ascii=False, default=str)]
+
+    def atom(match: re.Match[str]) -> str:
+        secret = secrets[int(match[1])]
+        if not spec or secret.name is None:
+            return str(secret)
+        ref = secret.ref or SecretRef(secret.name)
+        pinned = {"version": ref.version} if ref.version else {}
+        return yamlio.one_line(yamlio.Flow({"$secret": ref.name, **pinned}))
+
+    return [re.sub(rf"{token}(\d+)", atom, line) for line in found]
+
+
+def _block_line(mark: str, text: str) -> str:
+    return f"{mark} {text}" if text else mark  # a literal block's blank line, without a trailing space
 
 
 def _item(change: Change) -> bool:
     return bool(change.path) and isinstance(change.path[-1], int)
 
 
-def _spelled(value: Any) -> str:
+def _spelled(value: Any, flow: bool = True) -> str:
+    if flow and isinstance(value, yamlio.Flow):
+        return yamlio.one_line(value)
     found = shown(value)
     return str(found) if isinstance(found, Secret) else describe(found)
 
@@ -237,13 +337,22 @@ def _verdict(diff: Diff, source: str, spec: str) -> str:
 
 
 def drift_text(diff: Diff, source: str, spec: str, files: list[str]) -> str:
-    """Each difference with its location dimmed after it. `files` are warned about on stderr instead."""
+    """Each difference marked as applying the spec would make it, with its location dimmed after it and any
+    structured value below. `files` are warned about on stderr instead."""
     lines = []
     for change in diff.changes:
         location = _location(change)
         where_ = f"  {click.style(printable(location), dim=True)}" if location else ""
-        line = printable(f"{_subject(change)}: {message(change)}")
-        lines.append(f"{click.style('≠', fg='yellow')} {line}{where_}")
+        name = [] if change.identity is None else [(" ", PLAIN), (repr(change.identity), {"bold": True})]
+        runs = [(change.collection, PLAIN), *name, (": ", PLAIN), *_runs(change)]
+        line = "".join(
+            click.style(printable(text), **style) if style else printable(text) for text, style in runs
+        )
+        mark = marker(change)
+        lines.append(f"{click.style(mark, fg=MARKERS[mark])} {line}{where_}")
+        lines += [
+            f"    {click.style(_block_line(m, printable(text)), fg=MARKERS[m])}" for m, text in blocks(change)
+        ]
     lines.append(
         click.style(printable(_verdict(diff, source, spec)), fg="yellow" if diff.changes else "green")
     )
@@ -279,7 +388,7 @@ def _difference(change: Change) -> dict[str, Any]:
         "path": where(change.path),
         "segments": list(change.path),
         **{side: shown(value) for side, value in sides if shows and value is not ABSENT},
-        "message": message(change),
+        "message": message(change, whole=True),
         "location": _location(change),
         "default": change.default,
     }
@@ -299,6 +408,7 @@ def drift_github(diff: Diff, source: str, spec: str, files: list[str]) -> str:
             "drift-default" if c.default else "drift",
             f"{_subject(c)}: {message(c)}",
             _location(c),
+            [f"    {_block_line(m, text)}" for m, text in blocks(c)],
         )
         for c in diff.changes
     ]
@@ -307,8 +417,11 @@ def drift_github(diff: Diff, source: str, spec: str, files: list[str]) -> str:
     return "\n".join(lines)
 
 
-def _annotation(severity: Severity, title: str, message: str, location: str | None) -> str:
-    """`::error file=..,line=..,title=..::message`, escaped as GitHub's workflow commands require."""
+def _annotation(
+    severity: Severity, title: str, message: str, location: str | None, more: list[str] | None = None
+) -> str:
+    """`::error file=..,line=..,title=..::message`, escaped as GitHub's workflow commands require, with
+    `more` lines after the message's own."""
     properties = []
     if location:
         file, _, line = location.rpartition(":")
@@ -318,7 +431,8 @@ def _annotation(severity: Severity, title: str, message: str, location: str | No
         if line:
             properties.append(f"line={line}")
     properties.append(f"title={_escape(title, property_=True)}")
-    return f"::{severity} {','.join(properties)}::{_escape(printable(message))}"
+    body = "\n".join(printable(line) for line in [message, *(more or [])])
+    return f"::{severity} {','.join(properties)}::{_escape(body)}"
 
 
 def _escape(text: str, property_: bool = False) -> str:

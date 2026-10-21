@@ -5,7 +5,6 @@ check-yaml with no excludes, and some of the team check out on Windows. Hooks ru
 their real entry points; checkouts go through a real git with an isolated configuration.
 """
 
-import ast
 import os
 import re
 import shlex
@@ -26,6 +25,7 @@ from tests.conftest import (
     ROOT,
     THIRD_PARTY_EXPORTS,
     Result,
+    drift_reported,
     export_id,
     load_export,
     run_tiggy,
@@ -68,7 +68,6 @@ repos:
       - id: check-yaml
 """
 
-DIFFERENCE = re.compile(r"≠ (\w+) ('(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"): ")
 EXPORT_TIME = re.compile(rb'"exportTime": "[^"]*"')
 
 
@@ -200,14 +199,10 @@ def _every_file(spec: Path) -> list[str]:
 
 
 def _named(result: Result) -> set[tuple[str, str]]:
-    """The (kind, name) of every object `import --check` reports as differing."""
-    lines = [line for line in result.out.splitlines() if line.startswith("≠ ")]
-    named = set()
-    for line in lines:
-        match = DIFFERENCE.match(line)
-        assert match, f"unexpected difference line: {line}"
-        named.add((match[1], ast.literal_eval(match[2])))
-    assert len(named) == len(lines), result.out
+    """The (kind, name) of every object `import --check` reports as differing, each once."""
+    found = drift_reported(result)
+    named = {(d.kind, d.name) for d in found}
+    assert len(named) == len(found), result.out
     return named
 
 

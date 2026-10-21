@@ -19,15 +19,16 @@ from typing import Any
 
 from tiggy.gtm.base import GtmModel
 from tiggy.gtm.resources import Container, ContainerVersion, GtagConfig
-from tiggy.secrets import PLACEHOLDER, is_placeholder
+from tiggy.secrets import PLACEHOLDER, SecretRef, is_placeholder
 from tiggy.spec import canon
-from tiggy.spec.codec import EXPLICIT, NO_SHORTHAND, scalar
+from tiggy.spec.codec import EXPLICIT, NO_SHORTHAND, Codec, Unwritable, scalar
 from tiggy.spec.compiler import BY_SPEC_KEY, Compiled
 from tiggy.spec.layout import SECTION_ORDER
 from tiggy.spec.loader import KINDS, Entry, LoadedSpec
 from tiggy.spec.overlay import COLLECTIONS, DEFAULTS, UNMODELLED, Field, Role, fields
 from tiggy.spec.problems import Origin, Window, at, at_item, difference, long, same, window
 from tiggy.spec.refs import spelled
+from tiggy.spec.yamlio import Map
 
 SIDES = ("the container", "the spec")
 NOT_STORED = ", not the stored value"
@@ -51,12 +52,21 @@ class Op(StrEnum):
     MOVED = "moved"  # a list item on both sides at different indexes, which left and right hold
 
 
+class Form(StrEnum):
+    """What a Change's σ values are, so `written` can spell them as a spec does."""
+
+    PARAMETER = "parameter"  # one parameter, written on its own or as a list's item
+    KEYED = "keyed"  # one parameter, written under its GTM key: the path's last segment
+    PARAMETERS = "parameters"  # parameters σ keyed, or a list of them
+
+
 @dataclass(frozen=True)
 class Secret:
     """A secret's place in a value: named by the spec, or None when recognised only by its value."""
 
-    name: str | None
+    name: str | None  # as it stands in: `name@version` where the spec pins a version
     stored: bool = True  # False: the container holds a value other than the store's
+    ref: SecretRef | None = field(default=None, compare=False, repr=False)  # as the spec names it
 
     def __str__(self) -> str:
         if self.name is None:
@@ -76,7 +86,8 @@ class Change:
     window: Window | None = None
     members: bool = False  # a trigger set: left and right hold only the members that differ
     default: bool = False  # one side lacks only what GTM may fill in (unverified)
-    unexplained: str | None = None  # the whole message, when the walk can't say more; never a value
+    unexplained: str | None = None  # what the walk says in place of values, after any path; never a value
+    form: Form | type[GtmModel] | None = None  # a model: an item `_spec_keyed`; None: as a spec writes it
 
 
 @dataclass
@@ -102,15 +113,17 @@ def compare(
     values: dict[str, str] | None = None,
     known: tuple[str, ...] = (),
     exact: bool = False,
+    refs: Collection[SecretRef] = (),
 ) -> Diff:
     """`version` as exported against the spec compiled from `spec`, secrets standing in for themselves.
 
     `values` are fetched secrets by stand-in, compared as `_masked` says; `known` are values a secret
-    holds, never shown. `exact` makes an object equal only by σ a difference too.
+    holds, never shown; `refs` are the spec's secrets, so its side names each as it does. `exact` makes
+    an object equal only by σ a difference too.
     """
     dumped = canon.dump(compiled.version)
     left, right = canon.canon(version), canon.canon(dumped)
-    entries, scrub = _entries(spec), _Scrub(known, values)
+    entries, scrub = _entries(spec), _Scrub(known, values, refs)
     found = Diff()
     for s in _subjects(left, right, _labels(compiled, dumped), values):
         entry = entries.get((s.collection, s.identity))
@@ -292,15 +305,22 @@ def _holder(path: Path, wild: dict[Path, str | None]) -> Path | None:
     return next((path[:i] for i in range(len(path), 0, -1) if path[:i] in wild), None)
 
 
+def _unkeyed(path: Path, wild: dict[Path, str | None]) -> bool:
+    """Whether a list of parameters at `path`, which σ couldn't key, is where the spec holds a secret: it may
+    show whole, so any of its parameters may hold the secret under another key."""
+    return any(held[:-1] == path for held in wild)
+
+
 class _Scrub:
     """A value with no secret left in it to show: each stand-in, each known secret value, and each string
-    within a parameter where the spec holds a secret (`wild`) that it doesn't write out elsewhere
-    (`public`) becomes a Secret; a known value inside a longer string is cut out.
+    within a parameter where the spec holds a secret (`wild`), or a list of parameters `_unkeyed`, that it
+    doesn't write out elsewhere (`public`) becomes a Secret; a known value inside a longer string is cut out.
     """
 
-    def __init__(self, known: tuple[str, ...], values: dict[str, str] | None):
+    def __init__(self, known: tuple[str, ...], values: dict[str, str] | None, refs: Collection[SecretRef]):
         self.values = values
         self.known = sorted({v for v in (*known, *(values or {}).values()) if v}, key=len, reverse=True)
+        self.refs = {ref.placeholder: ref for ref in refs}
 
     def __call__(
         self,
@@ -312,12 +332,14 @@ class _Scrub:
         if isinstance(node, dict):
             return {key: self(value, wild, public, (*path, key)) for key, value in node.items()}
         if isinstance(node, list):
+            if wild and _unkeyed(path, wild):
+                wild = {path: None, **wild}
             return [self(value, wild, public, (*path, _item(value))) for value in node]
         if not isinstance(node, str):
             return node
         if is_placeholder(node):
-            name = node[len(PLACEHOLDER) :]
-            return Secret(name.removesuffix(NOT_STORED), stored=not name.endswith(NOT_STORED))
+            name = node.removesuffix(NOT_STORED)[len(PLACEHOLDER) :]
+            return Secret(name, stored=not node.endswith(NOT_STORED), ref=self.refs.get(PLACEHOLDER + name))
         held = _holder(path, wild) if wild and node and node not in public else None
         if held is not None and path[-1] not in NAMING:
             name = wild[held]
@@ -380,21 +402,27 @@ class _Walk:
             yield from self.object(f.model, x, y, path)
         elif f.role is Role.NESTED_LIST and isinstance(x, list) and isinstance(y, list):
             nested = partial(self.object, f.model)
-            yield from self.sequence(x, y, path, nested, partial(_spec_keyed, f.model))
+            yield from self.sequence(x, y, path, nested, partial(_spec_keyed, f.model), f.model)
         else:
             yield from self.value(x, y, path)
 
     def parameters(self, x: Any, y: Any, path: Path) -> Iterator[Change]:
-        """A parameter list or map: by GTM key where σ keyed it, else as a sequence."""
-        if isinstance(x, dict) and isinstance(y, dict):
-            for key in _keys(y, x):
-                yield from self.parameter(x.get(key, ABSENT), y.get(key, ABSENT), (*path, key))
-        elif isinstance(x, list) and isinstance(y, list):
-            yield from self.sequence(x, y, path, self.parameter)
+        """A parameter list or map: by GTM key where σ keyed it or could but for a repeated key, else as a
+        sequence."""
+        if isinstance(x, list) and isinstance(y, list):
+            yield from self.sequence(x, y, path, self.parameter, form=Form.PARAMETER)
+        elif (gx := _by_key(x)) is None or (gy := _by_key(y)) is None:
+            yield from self.value(x, y, path, Form.PARAMETERS)
         else:
-            yield from self.value(x, y, path)
+            for key in _keys(gy, gx):
+                xs, ys = gx.get(key, []), gy.get(key, [])
+                if xs and ys and len(xs) + len(ys) > 2:
+                    side = SIDES[0] if len(xs) > 1 else SIDES[1]
+                    yield self.change(Op.CHANGED, (*path, key), unexplained=f"repeated in {side}")
+                else:
+                    yield from self.parameter(_one(xs), _one(ys), (*path, key), keyed=True)
 
-    def parameter(self, x: Any, y: Any, path: Path) -> Iterator[Change]:
+    def parameter(self, x: Any, y: Any, path: Path, keyed: bool = False) -> Iterator[Change]:
         """One difference where both read as different shorthand scalars; otherwise one per member."""
         if _same(x, y):
             return
@@ -403,7 +431,7 @@ class _Walk:
             yield from self.value(sx, sy, path)
             return
         if not (isinstance(x, dict) and isinstance(y, dict)):
-            yield self.change(_op(x, y), path, x, y)
+            yield self.change(_op(x, y), path, x, y, form=Form.KEYED if keyed else Form.PARAMETER)
             return
         for member in _keys(y, x):
             p, q = x.get(member, ABSENT), y.get(member, ABSENT)
@@ -419,11 +447,11 @@ class _Walk:
             elif member == "value":  # at the parameter itself, as a side reads in shorthand where it can
                 yield from self.value(p if sx is NO_SHORTHAND else sx, q if sy is NO_SHORTHAND else sy, path)
             elif member == "list" and isinstance(p, list) and isinstance(q, list):
-                yield from self.sequence(p, q, path, self.parameter)
+                yield from self.sequence(p, q, path, self.parameter, form=Form.PARAMETER)
             elif member == "map":
                 yield from self.parameters(p, q, path)
             else:
-                yield from self.value(p, q, at)
+                yield from self.value(p, q, at, Form.PARAMETERS if member == "list" else None)
 
     def sequence(
         self,
@@ -432,31 +460,47 @@ class _Walk:
         path: Path,
         item: Callable[[Any, Any, Path], Iterator[Change]],
         whole: Callable[[Any], Any] = lambda v: v,
+        form: Form | type[GtmModel] | None = None,
     ) -> Iterator[Change]:
-        """Items matched in order; one gone in one place and new in another is moved, not two changes.
+        """Items matched in order; one gone in one place and new in another is moved, not two changes, and
+        within a run that changed, one in place of a like one is walked as that one changed. In index order,
+        a run's items gone before those new.
 
-        `whole` spells an item only one side has, which a change shows whole.
+        `whole` spells an item only one side has, which a change shows whole, as `form` says.
         """
         ka, kb = [_key(v) for v in a], [_key(v) for v in b]
-        gone, new = [], []
-        for tag, i1, i2, j1, j2 in SequenceMatcher(None, ka, kb, autojunk=False).get_opcodes():
-            if tag == "replace" and i2 - i1 == j2 - j1:
-                for i, j in zip(range(i1, i2), range(j1, j2)):
+        runs = [
+            (i1, i2, j1, j2, tag == "replace" and i2 - i1 == j2 - j1)  # aligned: paired by position
+            for tag, i1, i2, j1, j2 in SequenceMatcher(None, ka, kb, autojunk=False).get_opcodes()
+            if tag != "equal"
+        ]
+        moved: dict[int, int] = {}  # where the spec has an item: where the container has it
+        new = [j for _, _, j1, j2, aligned in runs if not aligned for j in range(j1, j2)]
+        for i in (i for i1, i2, _, _, aligned in runs if not aligned for i in range(i1, i2)):
+            j = next((j for j in new if kb[j] == ka[i] and j not in moved), None)
+            if j is not None:
+                moved[j] = i
+        for i1, i2, j1, j2, aligned in runs:
+            gone = [i for i in range(i1, i2) if i not in moved.values()]
+            came = [j for j in range(j1, j2) if j not in moved]
+            pairs = dict(zip(gone, came)) if aligned else _paired(gone, came, a, b)
+            gone = [i for i in gone if i not in pairs]
+            came = [j for j in range(j1, j2) if j not in pairs.values()]
+            for i, j in [*pairs.items(), (i2, j2)]:
+                while gone and gone[0] < i:
+                    n = gone.pop(0)
+                    yield self.change(Op.ONLY_LEFT, (*path, n), whole(a[n]), form=form)
+                while came and came[0] < j:
+                    n = came.pop(0)
+                    if n in moved:
+                        yield self.change(Op.MOVED, (*path, n), moved[n], n)
+                    else:
+                        yield self.change(Op.ONLY_RIGHT, (*path, n), right=whole(b[n]), form=form)
+                if i < i2:
                     yield from item(a[i], b[j], (*path, j))
-            elif tag != "equal":
-                gone += range(i1, i2)
-                new += range(j1, j2)
-        for i in gone:
-            j = next((j for j in new if kb[j] == ka[i]), None)
-            if j is None:
-                yield self.change(Op.ONLY_LEFT, (*path, i), whole(a[i]))
-            else:
-                new.remove(j)
-                yield self.change(Op.MOVED, (*path, j), i, j)
-        for j in new:
-            yield self.change(Op.ONLY_RIGHT, (*path, j), right=whole(b[j]))
 
-    def value(self, x: Any, y: Any, path: Path) -> Iterator[Change]:
+    def value(self, x: Any, y: Any, path: Path, form: Form | None = None) -> Iterator[Change]:
+        """`form` says what the values are when they aren't both mappings, which are walked key by key."""
         if _same(x, y):
             return
         if isinstance(x, dict) and isinstance(y, dict):
@@ -465,11 +509,43 @@ class _Walk:
         elif isinstance(x, str) and isinstance(y, str) and long(x, y):
             yield self.change(Op.CHANGED, path, x, y, window=window(x, y))
         else:
-            yield self.change(_op(x, y), path, x, y)
+            yield self.change(_op(x, y), path, x, y, form=form)
 
 
 def _same(x: Any, y: Any) -> bool:
     return x is y if ABSENT in (x, y) else same(x, y)
+
+
+def _paired(gone: list[int], came: list[int], a: list[Any], b: list[Any]) -> dict[int, int]:
+    """Items gone from a run paired with those new in it where at least half of what they hold is equal,
+    the likest and nearest first, so a renamed cell reads as itself rather than as one row gone and another
+    new. Never out of order, which would hide a move."""
+    theirs = [_leaves(shown(b[j])) for j in came]
+    scored = []
+    for x, i in enumerate(gone):
+        mine = _leaves(shown(a[i]))
+        for y, j in enumerate(came):
+            if (score := _likeness(mine, theirs[y])) >= 0.5:
+                scored.append((-score, abs(x - y), i, j))
+    paired: dict[int, int] = {}
+    for _, _, i, j in sorted(scored):
+        crossed = any((i < k) != (j < v) for k, v in paired.items())
+        if i not in paired and j not in paired.values() and not crossed:
+            paired[i] = j
+    return dict(sorted(paired.items()))
+
+
+def _likeness(x: dict[Path, str], y: dict[Path, str]) -> float:
+    """The share of leaves (scalars and lists, by path into mappings) equal on both sides."""
+    union = x.keys() | y.keys()
+    equal = sum(k in x and k in y and x[k] == y[k] for k in union)
+    return equal / len(union) if union else 0.0
+
+
+def _leaves(value: Any, path: Path = ()) -> dict[Path, str]:
+    if isinstance(value, dict) and value:
+        return {k: v for key, item in value.items() for k, v in _leaves(item, (*path, key)).items()}
+    return {path: _key(value)}
 
 
 def _op(x: Any, y: Any) -> Op:
@@ -511,6 +587,24 @@ def _scalar(p: Any) -> Any:
 def _emptied(p: Any, other: Any) -> Any:
     """ABSENT as the empty list or map σ dropped, shaped like `other`, so the rows or keys differing show."""
     return type(other)() if p is ABSENT and isinstance(other, list | dict) else p
+
+
+def _by_key(params: Any) -> dict[str, list[Any]] | None:
+    """Parameters σ keyed, or listed for a repeated key, as each key's; None where one has no key."""
+    if isinstance(params, dict):
+        return {key: [p] for key, p in params.items()}
+    if not isinstance(params, list) or not all(
+        isinstance(p, dict) and isinstance(p.get("key"), str) for p in params
+    ):
+        return None
+    found: dict[str, list[Any]] = {}
+    for p in params:
+        found.setdefault(p["key"], []).append({k: v for k, v in p.items() if k != "key"})
+    return found
+
+
+def _one(items: list[Any]) -> Any:
+    return ABSENT if not items else items[0] if len(items) == 1 else items
 
 
 def _spec_keyed(model: type[GtmModel], value: Any) -> Any:
@@ -561,6 +655,111 @@ def shown(value: Any) -> Any:
     if isinstance(value, list):
         return [shown(v) for v in value]
     return value
+
+
+def written(value: Any, form: Form | type[GtmModel] | None, secret: Callable[[Secret], str]) -> Any:
+    """A Change's side as a spec writes it, through the codec, each Secret the string `secret` gives it; σ's
+    spelling for any parameter the codec can't write."""
+    return _Spelling().side(_secrets(value, secret), form)
+
+
+def _secrets(value: Any, secret: Callable[[Secret], str]) -> Any:
+    if isinstance(value, Secret):
+        return secret(value)
+    if isinstance(value, dict):
+        return type(value)((key, _secrets(v, secret)) for key, v in value.items())
+    if isinstance(value, list):
+        return [_secrets(v, secret) for v in value]
+    return value
+
+
+class _Spelling:
+    """σ back to GTM's shape for the codec, a trigger reference standing in as a token it can round-trip."""
+
+    def __init__(self):
+        self.refs: dict[str, Any] = {}
+        self.tokens: dict[str, str] = {}
+        self.codec = Codec(
+            trigger_ref=self.refs.__getitem__, trigger_id=lambda ref, _: self.tokens[_key(ref)]
+        )
+
+    def side(self, value: Any, form: Form | type[GtmModel] | None) -> Any:
+        if form is Form.PARAMETER:
+            return self.parameter(value)
+        if form is Form.KEYED:
+            return self.parameter(value, keyed=True)
+        if form is Form.PARAMETERS:
+            return self.parameters(value)
+        if isinstance(form, type):
+            return self.nested(form, value)
+        return value
+
+    def parameter(self, p: Any, keyed: bool = False) -> Any:
+        if not isinstance(p, dict):
+            return p
+        try:  # a keyed parameter never writes its key, so any will do
+            return self.codec.encode(self.gtm(p, "" if keyed else None), keyed)
+        except (Unwritable, ValueError, KeyError):
+            return shown(p)
+
+    def parameters(self, value: Any) -> Any:
+        if isinstance(value, dict):
+            items = [self.gtm(p, key) for key, p in value.items()]
+        elif isinstance(value, list) and all(
+            isinstance(p, dict) and isinstance(p.get("key"), str) for p in value
+        ):
+            items = [self.gtm(p) for p in value]
+        elif isinstance(value, list):
+            return [self.parameter(p) for p in value]
+        else:
+            return value
+        try:
+            return self.codec.encode_list(items)
+        except (Unwritable, ValueError, KeyError):
+            return shown(value)
+
+    def nested(self, model: type[GtmModel], value: Any) -> Any:
+        """An item `_spec_keyed`: spec keys already, but σ parameters."""
+        if not isinstance(value, dict):
+            return value
+        by_key = {f.key: f for f in fields(model)}
+        out = Map()
+        for key, v in value.items():
+            f = by_key.get(key)
+            if f is None or v is None:
+                out[key] = v
+            elif f.role is Role.PARAMETER:
+                out[key] = self.parameter(v)
+            elif f.role is Role.PARAMETER_LIST:
+                out[key] = self.parameters(v)
+            elif f.role is Role.NESTED:
+                out[key] = self.nested(f.model, v)
+            elif f.role is Role.NESTED_LIST and isinstance(v, list):
+                out[key] = [self.nested(f.model, item) for item in v]
+            else:
+                out[key] = v
+        return out
+
+    def gtm(self, p: Any, key: str | None = None) -> Any:
+        """A σ parameter as GTM holds it, under `key` where σ keyed it by one, its empty list or map back."""
+        if not isinstance(p, dict):
+            return p
+        out = {} if key is None else {"key": key}
+        out.update(p)
+        if out.get("type") == "TRIGGER_REFERENCE" and isinstance(out.get("value"), list):
+            ref = spelled(out["value"], Role.TRIGGER_REFS)
+            out["value"] = self.tokens.setdefault(_key(ref), f"ref{len(self.tokens)}")
+            self.refs[out["value"]] = ref
+        if isinstance(p.get("map"), dict):
+            out["map"] = [self.gtm(v, k) for k, v in p["map"].items()]
+        elif isinstance(p.get("map"), list):
+            out["map"] = [self.gtm(v) for v in p["map"]]
+        if isinstance(p.get("list"), list):
+            out["list"] = [self.gtm(v) for v in p["list"]]
+        for member, kind in (("list", "LIST"), ("map", "MAP")):
+            if out.get("type") == kind and member not in out and "value" not in out:
+                out[member] = []
+        return out
 
 
 def locate(entry: Entry, change: Change) -> Origin:

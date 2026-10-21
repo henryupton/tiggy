@@ -128,6 +128,10 @@ def _err(message: str) -> None:
         _silence(sys.stderr)
 
 
+def _note(message: str) -> None:
+    _err(f"{click.style('note:', fg='yellow')} {message}")
+
+
 @click.group(no_args_is_help=True)
 @click.version_option(__version__, prog_name="tiggy")
 @click.pass_context
@@ -248,9 +252,7 @@ def import_(
     read = _read_export(source)
     ignored = read.outside_container
     if ignored:
-        _err(
-            printable(f"note: {source} has fields outside the container, not imported: {', '.join(ignored)}")
-        )
+        _note(printable(f"{source} has fields outside the container, not imported: {', '.join(ignored)}"))
     secrets = find_secrets(read.raw_version)  # an object named with a secret is shown without it
     for finding in checks.unmodelled_enums(ContainerGraph(read.export.container_version)):
         line = secrets.masked(f"{finding.node}: {finding.message}")
@@ -272,12 +274,12 @@ def import_(
         diff = comparison.diff
         if diff.unread_secrets:
             unread = plural(diff.unread_secrets, "secret value")
-            _err(f"note: {unread} not compared (--resolve-secrets to compare them)")
+            _note(f"{unread} not compared (--resolve-secrets to compare them)")
         if diff.semantic_only and not exact:
             n = diff.semantic_only
             match, them = ("matches", "it") if n == 1 else ("match", "them")
-            _err(
-                f"note: {plural(n, 'object')} {match} only once order and empty lists are ignored "
+            _note(
+                f"{plural(n, 'object')} {match} only once order and empty lists are ignored "
                 f"(--exact counts {them})"
             )
         located = replace(diff, changes=[replace(c, origin=_within(c.origin, prefix)) for c in diff.changes])

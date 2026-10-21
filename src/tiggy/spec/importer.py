@@ -255,7 +255,8 @@ def check(
         )
     known = tuple(find_secrets(source).values.values())
     try:
-        return Comparison(diff.compare(source, compiled, spec, values, known, exact), compiled.warnings)
+        found = diff.compare(source, compiled, spec, values, known, exact, tuple(offline.refs))
+        return Comparison(found, compiled.warnings)
     except canon.CanonError as e:
         raise ImportError_(f"can't compare with {spec_dir}: {e}") from e
 

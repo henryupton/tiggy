@@ -126,8 +126,10 @@ def _run(*args: str | os.PathLike, close_stdout: bool = False, file_size_limit: 
     return Result(completed.returncode, raw_out.decode(), raw_err.decode(), raw_out, raw_err)
 
 
-def _on_a_terminal(*args: str | os.PathLike, env: dict[str, str | None] | None = None) -> tuple[int, bytes]:
-    """Runs tiggy with stdout on a pseudo-terminal, where colour is on by default."""
+def _on_a_terminal(
+    *args: str | os.PathLike, env: dict[str, str | None] | None = None, stderr: bool = False
+) -> tuple[int, bytes]:
+    """Runs tiggy with stdout (and stderr, if asked) on a pseudo-terminal, where colour is on by default."""
     import pty
 
     environment = base_env()
@@ -142,7 +144,7 @@ def _on_a_terminal(*args: str | os.PathLike, env: dict[str, str | None] | None =
             [_tiggy(), *(os.fspath(a) for a in args)],
             stdin=subprocess.DEVNULL,
             stdout=slave,
-            stderr=subprocess.DEVNULL,
+            stderr=slave if stderr else subprocess.DEVNULL,
             env=environment,
         )
     finally:
@@ -390,7 +392,7 @@ def test_check_exits_1_and_names_what_drifted(tmp_path: Path, imported):
     result = run_tiggy("import", live, spec, "--check")
     assert result.code == 1, str(result)
     assert scrub(result.out, live, spec) == (
-        "≠ tags 'GA4 - sign_up': paused (missing from the spec)  folders/ga4/tags.yml:45\n"
+        "- tags 'GA4 - sign_up': paused (missing from the spec)  folders/ga4/tags.yml:45\n"
         "1 difference between <path1> and <path2>\n"
     )
     assert _snapshot(spec) == before, "--check writes nothing"
@@ -727,7 +729,7 @@ def test_control_characters_in_names_are_escaped_in_text_output(command: str, co
         result, shown = run_tiggy("import", export, spec), [f"Imported {SHOWN_CONTAINER} into "]
     elif command == "import --check":
         live = _variant(tmp_path, "live.json", _forged_and_paused)
-        result, shown = run_tiggy("import", live, spec, "--check"), [f"≠ tags '{SHOWN_TAG}': paused"]
+        result, shown = run_tiggy("import", live, spec, "--check"), [f"- tags '{SHOWN_TAG}': paused"]
     else:
         twice = _variant(tmp_path, "twice.json", _forged_twice)
         result, shown = run_tiggy("import", twice, tmp_path / "other"), [f"2 tags are named '{SHOWN_TAG}'"]
@@ -767,10 +769,14 @@ def test_findings_still_exit_1_on_a_non_utf8_stdout(command: str, tmp_path: Path
     assert shows in result.out
 
 
-def test_output_to_a_file_or_pipe_is_never_coloured(imported):
-    spec = imported(ANALYTICS)
+def test_output_to_a_file_or_pipe_is_never_coloured(tmp_path, imported):
+    spec, drifted = imported(ANALYTICS), imported(ANALYTICS, "drifted")
     _with_bogus_key(spec)
-    for args in (("validate", LEGACY), ("export", spec)):
+    replace_in_spec(
+        drifted, "folders/ga4/tags.yml", "        - parameter: plan_name\n", "        - parameter: plan\n"
+    )
+    live = _variant(tmp_path, "live.json", _drifted_every_way)
+    for args in (("validate", LEGACY), ("export", spec), ("import", live, drifted, "--check")):
         result = run_tiggy(*args, env={"NO_COLOR": None})
         assert result.code == 1, str(result)
         assert "\x1b[" not in result.out + result.err, str(result)
@@ -790,20 +796,56 @@ def test_no_color_turns_colour_off_on_a_terminal():
     assert b"\x1b[" not in out, out[:200]
 
 
+def _drifted_every_way(version: dict[str, Any]) -> None:
+    """GA4 - sign_up paused, its firing option cleared, its event renamed and a row added to its table."""
+    tag = _tag(version, "GA4 - sign_up")
+    tag["paused"] = True
+    del tag["tagFiringOption"]
+    parameters = {p["key"]: p for p in tag["parameter"]}
+    parameters["eventName"]["value"] = "signup"
+    cells = [("parameter", "note"), ("parameterValue", "{{Page URL}}")]
+    row = {"type": "MAP", "map": [{"type": "TEMPLATE", "key": k, "value": v} for k, v in cells]}
+    parameters["eventSettingsTable"]["list"].append(row)
+
+
+ANSI = re.compile(rb"\x1b\[[0-9;]*m")
+COLOURED = [  # each a fragment of the terminal's bytes: red, green, yellow, bold, dim and cyan
+    "\x1b[33mnote:\x1b[0m ",
+    "\x1b[31m-\x1b[0m variables \x1b[1m'DLV - event_attributes.method'\x1b[0m: \x1b[36mformat_value\x1b[0m "
+    "(missing from the spec; \x1b[33mGTM's default, unverified\x1b[0m)  "
+    "\x1b[2mfolders/data-layer/variables.yml:",
+    "\x1b[31m-\x1b[0m tags \x1b[1m'GA4 - sign_up'\x1b[0m: \x1b[36mpaused\x1b[0m (missing from the spec)  "
+    "\x1b[2mfolders/ga4/tags.yml:45\x1b[0m",
+    "\x1b[32m+\x1b[0m tags \x1b[1m'GA4 - sign_up'\x1b[0m: \x1b[36mtag_firing_option\x1b[0m "
+    "(missing from the container)",
+    "\x1b[31m-\x1b[0m tags \x1b[1m'GA4 - sign_up'\x1b[0m: \x1b[36mparameter.eventSettingsTable[2]\x1b[0m "
+    "(only in the container)",
+    "\r\n    \x1b[31m- parameter: note\x1b[0m\r\n    \x1b[31m- parameterValue: '{{Page URL}}'\x1b[0m\r\n",
+    "\x1b[33m~\x1b[0m tags \x1b[1m'GA4 - sign_up'\x1b[0m: \x1b[36mparameter.eventName\x1b[0m "
+    "(\x1b[31m'signup'\x1b[0m in the container, \x1b[32m'sign_up'\x1b[0m in the spec)",
+    "\x1b[33m5 differences between ",
+]
+
+
 @POSIX
-@pytest.mark.parametrize("no_color", [None, "1"], ids=["colour", "NO_COLOR"])
-def test_check_marks_drift_and_dims_its_line_on_a_terminal_unless_no_color(no_color, tmp_path, imported):
+def test_check_colours_each_part_of_a_difference_on_a_terminal_and_no_color_keeps_every_character(
+    tmp_path, imported
+):
+    """Markers, values and block lines by side (red the container's, green the spec's, yellow a change),
+    the object's name bold, its path cyan and its line dim; NO_COLOR prints the same characters, plain."""
     spec = imported(ANALYTICS)
-    live = _variant(tmp_path, "live.json", _paused_in_the_ui)
+    method = "  - name: DLV - event_attributes.method\n    type: v\n    folder: Data Layer\n"
+    replace_in_spec(spec, "folders/data-layer/variables.yml", f"{method}    format_value: {{}}\n", method)
+    export = load_export(ANALYTICS)
+    export["vendorNote"] = "outside the container"
+    _drifted_every_way(export["containerVersion"])
+    live = write_export(export, tmp_path / "live.json")
 
-    code, out = _on_a_terminal("import", live, spec, "--check", env={"NO_COLOR": no_color})
+    code, coloured = _on_a_terminal("import", live, spec, "--check", env={"NO_COLOR": None}, stderr=True)
+    plain_code, plain = _on_a_terminal("import", live, spec, "--check", env={"NO_COLOR": "1"}, stderr=True)
 
-    assert code == 1
-    if no_color:
-        assert b"\x1b[" not in out, out[:200]
-        assert (
-            "≠ tags 'GA4 - sign_up': paused (missing from the spec)  folders/ga4/tags.yml:45".encode() in out
-        )
-    else:
-        assert "\x1b[33m≠\x1b[0m tags 'GA4 - sign_up': paused".encode() in out, out[:200]
-        assert "(missing from the spec)  \x1b[2mfolders/ga4/tags.yml:45\x1b[0m".encode() in out, out[:200]
+    assert (code, plain_code) == (1, 1)
+    for fragment in COLOURED:
+        assert fragment.encode() in coloured, (fragment, coloured.decode())
+    assert b"\x1b[" not in plain, plain.decode()
+    assert ANSI.sub(b"", coloured) == plain

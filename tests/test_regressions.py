@@ -1208,8 +1208,8 @@ def escaped_in_check(tmp_path: Path, imported) -> tuple[Any, list[str]]:
     tag(renamed["containerVersion"])["name"] = "HTML\x1b[31m - y"
     source = write_export(renamed, tmp_path / "renamed.json")
     return run_tiggy("import", source, spec, "--check"), [
-        "≠ tags 'HTML\\x1b[31m - x': only in the spec",
-        "≠ tags 'HTML\\x1b[31m - y': only in the container",
+        "+ tags 'HTML\\x1b[31m - x': only in the spec",
+        "- tags 'HTML\\x1b[31m - y': only in the container",
     ]
 
 
@@ -1267,7 +1267,7 @@ def test_check_shows_a_window_into_a_long_value_not_the_whole_value(tmp_path: Pa
 
     assert result.code == 1, result
     difference = result.out.splitlines()[0]
-    assert difference.startswith("≠ tags 'HTML - big': parameter.html (from line 202, character 39: ")
+    assert difference.startswith("~ tags 'HTML - big': parameter.html (from line 202, character 39: ")
     assert difference.endswith("  unfiled/html-big.html:202") and len(difference) < 300
 
 

@@ -6,7 +6,6 @@ GTM changes without meaning anything (collection order, IDs, fingerprints) must 
 what a spec writes in another order or leaves empty; anything else is drift, at the line to edit.
 """
 
-import ast
 import copy
 import json
 import random
@@ -23,6 +22,7 @@ from tests.conftest import (
     CDM_EXPORTS,
     FIXTURES,
     Result,
+    drift_reported,
     edit_spec,
     export_id,
     line_of,
@@ -64,7 +64,6 @@ TRIGGER_ID_LISTS = {
     "customEvaluationTriggerId",
 }
 LATER = "1767225600000"  # a fingerprint GTM would stamp after the fixtures were exported
-DIFFERENCE = re.compile(r"≠ (\w+) ('(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"): (.*)")
 
 Version = dict[str, Any]
 
@@ -124,14 +123,10 @@ def hotfix(imported, tmp_path: Path, fixture: Path, edit: Callable[[Version], No
 
 
 def differences(result: Result) -> dict[tuple[str, str], list[str]]:
-    """What `import --check` listed, as {(kind, name): [details]}; a line about no one object fails."""
-    *listed, summary = result.out.splitlines()
+    """What `import --check` listed, as {(kind, name): [details]}, each with its block's lines after it."""
     found = defaultdict(list)
-    for line in listed:
-        match = DIFFERENCE.fullmatch(line)
-        assert match, f"not a difference in one object: {line!r}\n{result}"
-        found[match[1], ast.literal_eval(match[2])].append(match[3])
-    assert re.fullmatch(rf"{len(listed)} differences? between .+ and .+", summary), result
+    for d in drift_reported(result):
+        found[d.kind, d.name].append("\n".join([d.detail, *d.block]))
     return dict(found)
 
 
@@ -457,7 +452,7 @@ def test_checking_the_wrong_container_says_so(case, imported, tmp_path):
     result = check(tmp_path, spec, live)
     assert result.code == 2, result
     assert "GTM-TEST001" in result.err and public_id in result.err, result
-    assert "≠" not in result.out, result
+    assert result.out == "", result
 
 
 def test_a_spec_without_a_public_id_is_compared_object_by_object(imported, tmp_path):
@@ -782,8 +777,8 @@ def test_a_tag_moved_to_its_templates_other_form_names_the_form_on_both_sides(im
         result,
         {
             ("tags", "Meta - Pixel - Base"): [
-                'type ({"template": "Meta Pixel", "form": "container"} in the container, '
-                f'{{"template": "Meta Pixel", "form": "gallery"}} in the spec)  folders/meta/tags.yml:{line}'
+                "type ({template: Meta Pixel, form: container} in the container, "
+                f"{{template: Meta Pixel, form: gallery}} in the spec)  folders/meta/tags.yml:{line}"
             ]
         },
     )
@@ -854,10 +849,12 @@ def test_a_table_gtm_emptied_or_a_mapping_it_filled_names_each_row_and_key(impor
         {
             ("tags", "GA4 - sign_up"): [
                 f"monitoring_metadata.team (missing from the spec)  {tags}:{metadata}",
-                'parameter.eventSettingsTable[0] ({"parameter": "method", "parameterValue": '
-                f'"{{{{DLV - event_attributes.method}}}}"}} only in the spec)  {tags}:{rows[0]}',
-                'parameter.eventSettingsTable[1] ({"parameter": "plan_name", "parameterValue": '
-                f'"{{{{DLV - event_attri... (84 chars) only in the spec)  {tags}:{rows[1]}',
+                *(
+                    f"parameter.eventSettingsTable[{i}] (only in the spec)  {tags}:{row}\n"
+                    f"    + parameter: {name}\n"
+                    f"    + parameterValue: '{{{{DLV - event_attributes.{name}}}}}'"
+                    for i, (name, row) in enumerate(zip(("method", "plan_name"), rows))
+                ),
             ]
         },
     )
@@ -877,8 +874,9 @@ def test_a_teardown_tag_only_the_container_has_is_spelled_as_the_spec_writes_one
         result,
         {
             ("tags", "HTML - first-party POST"): [
-                'teardown_tag[1] ({"tag_name": "GA4 - page_view", "stop_teardown_on_failure": true} '
-                f"only in the container)  {tags}:{line}"
+                f"teardown_tag[1] (only in the container)  {tags}:{line}\n"
+                "    - tag_name: GA4 - page_view\n"
+                "    - stop_teardown_on_failure: true"
             ]
         },
     )
@@ -1032,9 +1030,11 @@ def _changed(version: Version, path: tuple[str | int, ...], kind: str) -> tuple[
 
 
 def _placed(change: diff.Change) -> bool:
-    """Explained, and at a line, unless it is a whole object the spec doesn't have."""
+    """Explained (an object's fallback has no path), and at a line, unless it is a whole object the spec
+    doesn't have."""
     whole_and_live_only = change.op is diff.Op.ONLY_LEFT and not change.path
-    return not change.unexplained and (change.origin is not None or whole_and_live_only)
+    fallback = change.unexplained and not change.path
+    return not fallback and (change.origin is not None or whole_and_live_only)
 
 
 def _refused(version: Version) -> bool:
