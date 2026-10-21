@@ -221,7 +221,7 @@ def unread_note(export: str | os.PathLike) -> str:
     """What `import --check` says on stderr about the secrets it didn't fetch for this export's spec."""
     from tiggy.spec.importer import find_secrets
 
-    n = len(find_secrets(load_export(export)["containerVersion"]).names)
+    n = len(find_secrets(load_export(export)["containerVersion"]).held)
     return (
         f"note: {n} secret value{'' if n == 1 else 's'} not compared (--resolve-secrets to compare them)\n"
         if n

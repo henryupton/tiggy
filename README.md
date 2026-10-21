@@ -126,9 +126,21 @@ each one as a reference and lists what to put in your secret store:
     # value: {$secret: const-meta-api-token, version: '3'}  # or a pinned one
 ```
 
-Import treats a value as a secret when its parameter key names one (`accessToken`, `apiSecret`, `apiKey`,
-`password` and the like), either directly or through a constant variable the parameter uses whole. The same
-value in several places is one secret. `validate` warns about a credential written in plain text in a spec.
+Import treats a value as a secret when a credential holds it: a parameter whose key names one (`accessToken`,
+`apiSecret`, `apiKeys`, `password` and the like), or the `value` beside a `name` that does, as in a request
+header named `Authorization`. That covers any string in a list or map under it, and the constant or lookup
+table it references, followed through constants that reference others. Text beside a reference can only be an
+auth scheme or punctuation (`Bearer {{const - meta api token}}`); anything else stops the import, since which
+part is secret isn't clear. The same value in several credentials is one secret.
+
+A secret of 12 characters or more found as a parameter's whole value anywhere else gets a reference of its
+own, named for that place, and import says whose value it matched: store the same value under it, or write the
+value back into the spec if it only matched by chance (a shared placeholder, say). Named apart, a placeholder
+never sends the real token out as a pixel ID. Inside a longer value (a URL, custom HTML or JavaScript,
+template code, a name), or in a field Tiggy copies as it is rather than modelling, a secret stops the import,
+which names the place and writes nothing. A shorter secret is a reference only where its credential holds it,
+since values that short occur naturally. `import --check` never shows a secret's value, and `validate` warns
+about a credential written in plain text in a spec.
 
 Where secrets live is not the spec's business: a targets file names the store, so the same spec reads from
 staging and production stores unchanged.

@@ -17,9 +17,9 @@ from typing import Any
 from pydantic import ValidationError
 
 from tiggy.gtm.resources import BuiltInVariable, Container, ContainerVersion, CustomTemplate
-from tiggy.secrets import Fetching, Offline, SecretRef, is_placeholder, secret_bearing
+from tiggy.secrets import Fetching, Offline, SecretRef, distinctive, is_placeholder, secret_bearing
 from tiggy.spec import canon, layout
-from tiggy.spec.codec import Codec
+from tiggy.spec.codec import Codec, dotted
 from tiggy.spec.compiler import compile_spec
 from tiggy.spec.convert import to_spec
 from tiggy.spec.layout import SpecObject
@@ -33,6 +33,10 @@ GITATTRIBUTES = "*.tpl -text\n*.html -text\n*.js -text\n"
 EDITORCONFIG = "[*.{tpl,html,js}]\ntrim_trailing_whitespace = false\ninsert_final_newline = false\n"
 VERSION_FIELDS = {f.alias: f.key for f in fields(ContainerVersion)}
 SIDES = ("the container", "the spec")
+REFERENCE = re.compile(r"\{\{([^{}]+)\}\}")
+AROUND_REFERENCES = re.compile(r"(?i)\s*(?:bearer|basic)?[\W_]*")  # what a credential holds besides them
+TABLES = {"smm", "remm"}  # lookup and regex tables
+NAMING = {"name", "key", "header", "headername"}  # map entries naming the value beside them
 
 
 class ImportError_(Exception):
@@ -45,18 +49,38 @@ class ImportResult:
     fragments: list[str] = field(default_factory=list)
     sidecars: list[str] = field(default_factory=list)
     secrets: dict[str, str] = field(default_factory=dict)  # the name written for each, -> where it was
+    shared: dict[str, str] = field(default_factory=dict)  # a secret named for its place -> the one it matched
 
 
 @dataclass
 class Secrets:
-    """The secrets in an export: the parameters holding one, and the value and origin of each name."""
+    """The secrets in an export: each name's value and origin, and the parameters to write as references."""
 
-    names: dict[int, str] = field(default_factory=dict)  # id() of a parameter -> its secret's name
     values: dict[str, str] = field(default_factory=dict)
     origins: dict[str, str] = field(default_factory=dict)
+    names: dict[str, str] = field(default_factory=dict)  # value -> the name its credential holds it as
+    held: dict[int, str] = field(default_factory=dict)  # id() of each parameter to write as a reference
+    places: dict[int, str] = field(default_factory=dict)  # id() of each of those -> where it is
+    shared: dict[str, str] = field(default_factory=dict)  # a name given a place -> the secret it matched
+    unwritable: list[str] = field(default_factory=list)  # secrets no reference could stand in for
+    written: set[int] = field(default_factory=set)  # held parameters the codec has written
+
+    def name_for(self, p: dict[str, Any]) -> str | None:
+        """The secret a parameter is written as, noted as written: the codec writes nothing else for it."""
+        name = self.held.get(id(p))
+        if name:
+            self.written.add(id(p))
+        return name
 
     def resolve(self, ref: SecretRef, origin: Any) -> str:
         return self.values.get(ref.name, ref.placeholder)
+
+    def masked(self, text: str) -> str:
+        """`text` with each distinctive secret shown as `<secret name>`, for an object named with one."""
+        for value, name in sorted(self.names.items(), key=lambda item: -len(item[0])):  # longest first
+            if distinctive(value):
+                text = text.replace(value, f"<secret {name}>")
+        return text
 
 
 def import_version(source: dict[str, Any], spec_dir: Path) -> ImportResult:
@@ -80,7 +104,21 @@ def import_version(source: dict[str, Any], spec_dir: Path) -> ImportResult:
         )
     _preconditions(source)
     secrets = find_secrets(source)
+    if secrets.unwritable:
+        raise ImportError_(
+            "can't import this container without writing a secret: "
+            f"{secrets.masked('; '.join(secrets.unwritable))}, and only a whole parameter value can be "
+            "{$secret: name}"
+        )
     planned, result = _plan(source, secrets)
+    unwritten = [
+        f"{name} is in {secrets.places[i]}" for i, name in secrets.held.items() if i not in secrets.written
+    ]
+    if unwritten:
+        raise ImportError_(
+            "can't import this container without writing a secret: "
+            f"{secrets.masked('; '.join(unwritten))}, which Tiggy copies as it is, not as {{$secret: name}}"
+        )
     files = {}
     for path, tree in planned.fragments.items():
         try:
@@ -88,6 +126,10 @@ def import_version(source: dict[str, Any], spec_dir: Path) -> ImportResult:
         except YamlError as e:
             raise ImportError_(f"can't write {path}: {e}") from e
     files.update({path: body.encode("utf-8") for path, body in planned.sidecars.items()})
+    for path, data in files.items():  # whatever else went wrong, no file goes out holding a secret
+        for name, value in secrets.values.items():
+            if distinctive(value) and value.encode("utf-8") in data:
+                raise ImportError_(f"can't import this container: {secrets.masked(path)} would hold {name}")
     files.update({".gitattributes": GITATTRIBUTES.encode(), ".editorconfig": EDITORCONFIG.encode()})
     try:
         if existing is not None:
@@ -99,6 +141,7 @@ def import_version(source: dict[str, Any], spec_dir: Path) -> ImportResult:
     result.fragments = sorted(planned.fragments)
     result.sidecars = sorted(planned.sidecars)
     result.secrets = dict(sorted(secrets.origins.items()))
+    result.shared = dict(sorted(secrets.shared.items()))
     return result
 
 
@@ -174,8 +217,7 @@ def _stage(staging: Path, files: dict[str, bytes], source: dict[str, Any], secre
         compiled = compile_spec(load_spec(staging), secrets.resolve)
     except SpecError as e:
         raise ImportError_(f"the spec Tiggy wrote doesn't load back, which is a bug in Tiggy:\n{e}") from e
-    names = {value: name for name, value in secrets.values.items()}
-    left, right = (_hidden(v, names) for v in (source, canon.dump(compiled.version)))
+    left, right = (_hidden(v, secrets.names) for v in (source, canon.dump(compiled.version)))
     difference = canon.compare(left, right, ("the export", "the written spec"))
     if difference is None and _public_id(compiled.version) != source["container"].get("publicId"):
         difference = "container.publicId"
@@ -199,6 +241,7 @@ def check(source: dict[str, Any], spec_dir: Path, secrets: Fetching | None = Non
     each is compared with what it fetches, and either way no secret's value is ever shown.
     """
     _preconditions(source)
+    exported = find_secrets(source)
     left = canon.canon(source)
     offline = Offline()
     compiled = compile_spec(load_spec(spec_dir), offline)
@@ -216,6 +259,8 @@ def check(source: dict[str, Any], spec_dir: Path, secrets: Fetching | None = Non
     except canon.CanonError as e:
         raise ImportError_(f"can't compare with {spec_dir}: {e}") from e
     left, unread = _masked(left, right, values)
+    # The export may hold a secret where the spec has none, pasted into a field in the UI, say.
+    left, right = _hidden(left, exported.names), _hidden(right, exported.names)
     differences = []
     for key in sorted(set(left) | set(right)):
         name = COLLECTIONS[key][0] if key in COLLECTIONS else VERSION_FIELDS.get(key, key)
@@ -234,7 +279,7 @@ def check(source: dict[str, Any], spec_dir: Path, secrets: Fetching | None = Non
                     differences.append(f"{name} {identity!r}: {found}")
         elif found := canon.difference(left[key], right[key], sides=SIDES):
             differences.append(f"{name}: {found}")
-    return Comparison([_shown(d) for d in differences], compiled.warnings, unread)
+    return Comparison([exported.masked(_shown(d)) for d in differences], compiled.warnings, unread)
 
 
 def _shown(difference: str) -> str:
@@ -322,58 +367,159 @@ def umask() -> int:
 
 
 def find_secrets(source: dict[str, Any]) -> Secrets:
-    """Each value a secret-bearing parameter holds, or names whole as a constant variable (`{{name}}`)."""
+    """Each value a credential holds, under it or through the variables it uses, and where else it is."""
     found = Secrets()
-    constants = {
-        v.get("name"): p
-        for v in source.get("variable") or []
-        if v.get("type") == "c"
-        for p in v.get("parameter") or []
-        if p.get("key") == "value" and p.get("type") == "TEMPLATE" and isinstance(p.get("value"), str)
-    }
-    by_value: dict[str, str] = {}
+    variables = {v.get("name"): v for v in source.get("variable") or [] if isinstance(v, dict)}
 
-    def record(param: dict[str, Any], label: str, where: str) -> None:
+    def record(param: dict[str, Any], label: str, where: str, matched: str | None = None) -> None:
         value = param["value"]
-        if value not in by_value:
+        if id(param) in found.held:
+            return
+        name = found.names.get(value) if matched is None else None  # one value in several credentials
+        if name is None:
             name, n = layout.slug(label, "secret"), 2
             while name in found.values:
                 name, n = f"{layout.slug(label, 'secret')}-{n}", n + 1
-            by_value[value] = name
             found.values[name], found.origins[name] = value, where
-        found.names[id(param)] = by_value[value]
+            found.names.setdefault(value, name)
+            if matched:
+                found.shared[name] = matched
+        found.held[id(param)], found.places[id(param)] = name, where
 
-    for alias, (key, _, _) in COLLECTIONS.items():
-        for item in source.get(alias) or []:
-            for param in _parameters(item):
-                value = param.get("value")
-                if not secret_bearing(param.get("key")) or param.get("type") != "TEMPLATE":
-                    continue
-                if not isinstance(value, str) or not value:
-                    continue
-                whole = re.fullmatch(r"\{\{([^{}]+)\}\}", value)
-                if whole and whole[1] in constants:
-                    record(constants[whole[1]], whole[1], f"variable {whole[1]!r}")
-                elif "{{" not in value:
-                    owner = item.get("name") or item.get("type")
-                    record(
-                        param,
-                        f"{owner} {param['key']}",
-                        f"{key[:-1].replace('_', ' ')} {owner!r}, {param['key']}",
-                    )
+    def take(param: dict[str, Any], label: str, where: str, seen: frozenset[str]) -> None:
+        value = param.get("value")
+        if not isinstance(value, str) or not value:
+            return
+        if "{{" not in value:
+            record(param, label, where)
+            return
+        for ref in REFERENCE.findall(value):
+            for output, name, path in _outputs(variables.get(ref)) if ref not in seen else ():
+                take(output, name, f"variable {ref!r}" + (f", {dotted(path)}" if path else ""), seen | {ref})
+        if not AROUND_REFERENCES.fullmatch(REFERENCE.sub("", value)):
+            found.unwritable.append(
+                f"{where} mixes a reference with other text, so which part is secret isn't clear"
+            )
+
+    for owner, label, node in _owners(source):
+        for path, credential, param in _credentials(node, ()):
+            for here, held in _templates(param, path):
+                take(held, f"{label} {credential}", f"{owner}, {dotted(here)}", frozenset())
+    recognisable = {value: name for value, name in found.names.items() if distinctive(value)}
+    for owner, label, node in _owners(source):
+        for path, text, holder in _walk(node, ()):
+            if holder is not None and id(holder) in found.held:
+                continue
+            where = f"{owner}, {dotted(path)}"
+            if holder is not None and text in recognisable:  # its own name, so a placeholder can't leak one
+                key = next((s for s in reversed(path) if isinstance(s, str)), "secret")
+                record(
+                    holder,
+                    str(label) if path == ("parameter", "value") else f"{label} {key}",
+                    where,
+                    recognisable[text],
+                )
+            else:
+                found.unwritable += [
+                    f"{name} is part of {where}" for value, name in recognisable.items() if value in text
+                ]
     return found
 
 
-def _parameters(node: Any):
-    """Every parameter in an object, nested ones in lists and maps included."""
-    if isinstance(node, dict):
-        if isinstance(node.get("key"), str) and "type" in node:
-            yield node
-        for value in node.values():
-            yield from _parameters(value)
+def _owners(source: dict[str, Any]):
+    """Each part of an export: how to name it (`tag 'name'`), a label for its secrets, and itself."""
+    version = {k: v for k, v in source.items() if k != "container" and k not in COLLECTIONS}
+    yield "the container", "container", source.get("container")
+    yield "the version", "version", version
+    for alias, (key, _, _) in COLLECTIONS.items():
+        for item in source.get(alias) or []:
+            label = item.get("name") or item.get("type")
+            yield f"{key[:-1].replace('_', ' ')} {label!r}", label, item
+
+
+def _credentials(node: Any, path: tuple[str | int, ...], header: str | None = None):
+    """Each parameter holding a credential, its path and what it's called, other than one inside another.
+
+    A parameter is one by its key, or as the value in a map naming one, as `{name: Authorization, value:
+    ...}` does a request header.
+    """
+    if isinstance(node, list):
+        for i, item in enumerate(node):
+            key = item.get("key") if isinstance(item, dict) else None
+            yield from _credentials(item, (*path, key if isinstance(key, str) else i), header)
+    elif isinstance(node, dict):
+        parameter, key = "type" in node, node.get("key")
+        if parameter and secret_bearing(key):
+            yield path, key, node
+            return
+        if parameter and header and isinstance(key, str) and key.lower().endswith("value"):
+            yield path, header, node
+            return
+        named = _header(node.get("map")) if parameter else None
+        for field_, value in node.items():
+            here = path if parameter and field_ in ("list", "map") else (*path, field_)
+            yield from _credentials(value, here, named if field_ == "map" else None)
+
+
+def _header(entries: Any) -> str | None:
+    """The credential a parameter's map entries name, if they name one."""
+    for entry in entries if isinstance(entries, list) else []:
+        if (
+            isinstance(entry, dict)
+            and str(entry.get("key")).lower() in NAMING
+            and secret_bearing(entry.get("value"))
+        ):
+            return entry["value"]
+    return None
+
+
+def _templates(param: dict[str, Any], path: tuple[str | int, ...]):
+    """Each value at or under `param`, with its path: list items by index, map entries by key."""
+    if param.get("type") in ("TEMPLATE", "INTEGER"):
+        yield path, param
+    for member in ("list", "map"):
+        children = param.get(member)
+        for i, child in enumerate(children if isinstance(children, list) else []):
+            if isinstance(child, dict):
+                key = child.get("key") if member == "map" else None
+                yield from _templates(child, (*path, key if isinstance(key, str) else i))
+
+
+def _outputs(variable: Any):
+    """What a constant or lookup table can return: each parameter holding it, a label, and its path."""
+    if not isinstance(variable, dict):
+        return
+    name, kind = variable.get("name"), variable.get("type")
+    for p in variable.get("parameter") or []:
+        key = p.get("key")
+        if kind == "c" and key == "value":
+            yield p, name, ()  # a constant is named for itself
+        elif kind in TABLES and key == "defaultValue":
+            yield p, f"{name} default", ("parameter", key)
+        elif kind in TABLES and key == "map":
+            for i, row in enumerate(p.get("list") or []):
+                entries = {e.get("key"): e for e in row.get("map") or []} if isinstance(row, dict) else {}
+                match = entries.get("key", {}).get("value")
+                if "value" in entries:
+                    label = f"{name} {match if isinstance(match, str) else i}"
+                    yield entries["value"], label, ("parameter", "map", i, "value")
+
+
+def _walk(node: Any, path: tuple[str | int, ...]):
+    """Each string in `node`, its path (parameters by key) and the parameter it is the value of, if any."""
+    if isinstance(node, str):
+        yield path, node, None
     elif isinstance(node, list):
-        for value in node:
-            yield from _parameters(value)
+        for i, item in enumerate(node):
+            key = item.get("key") if isinstance(item, dict) else None
+            yield from _walk(item, (*path, key if isinstance(key, str) else i))
+    elif isinstance(node, dict):
+        parameter = "type" in node
+        for field_, value in node.items():
+            if parameter and field_ == "value" and isinstance(value, str):
+                yield path, value, node
+            else:
+                yield from _walk(value, path if parameter and field_ in ("list", "map") else (*path, field_))
 
 
 def _plan(source: dict[str, Any], secrets: Secrets) -> tuple[layout.Plan, ImportResult]:
@@ -382,7 +528,7 @@ def _plan(source: dict[str, Any], secrets: Secrets) -> tuple[layout.Plan, Import
         trigger_ref=refs.trigger_ref,
         trigger_id=refs.trigger_id,
         secret=secrets.resolve,
-        secret_for=lambda p: secrets.names.get(id(p)),
+        secret_for=secrets.name_for,
     )
     result = ImportResult()
     try:
@@ -435,7 +581,7 @@ def _code(model, item: dict[str, Any], node: Map) -> list[tuple[str, str, str]]:
     key, ext = code
     exact = [p for p in item.get("parameter") or [] if p.get("key") == key]
     if len(exact) == 1 and set(exact[0]) == {"type", "key", "value"} and exact[0]["type"] == "TEMPLATE":
-        if isinstance(exact[0]["value"], str):
+        if isinstance(parameters.get(key), str):  # not a {$secret: name}, whose value no file may hold
             return [(key, ext, exact[0]["value"])]
     return []
 

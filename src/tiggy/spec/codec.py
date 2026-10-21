@@ -38,11 +38,15 @@ class Unwritable(ValueError):
 
     def __init__(self, detail: str, path: tuple[str | int, ...] = ()):
         self.detail, self.path = detail, path
-        where = "".join(_segment(s) for s in path).lstrip(".") or "a parameter"
-        super().__init__(f"{where} can't be written exactly yet: {detail}")
+        super().__init__(f"{dotted(path) or 'a parameter'} can't be written exactly yet: {detail}")
 
     def within(self, segment: str | int) -> "Unwritable":
         return Unwritable(self.detail, (segment, *self.path))
+
+
+def dotted(path: tuple[str | int, ...]) -> str:
+    """A path of fields, keys and indexes as `parameter.list[0]`."""
+    return "".join(_segment(s) for s in path).lstrip(".")
 
 
 def _segment(s: str | int) -> str:
@@ -60,7 +64,7 @@ class Codec:
     read_file: Callable[[Any, Origin], str] | None = None
     problems: Collector | None = None
     secret: Resolve | None = None  # a `{$secret: name}`'s value, fetched or stood in for
-    secret_for: Callable[[dict[str, Any]], str | None] | None = None  # on import, the name a value gets
+    secret_for: Callable[[dict[str, Any]], str | None] | None = None  # on import, the secret a parameter is
     # Each node is encoded once per call, though the readable and explicit forms both need its children.
     _memo: dict[tuple[int, bool], Any] | None = field(default=None, init=False, repr=False)
 
@@ -138,7 +142,7 @@ class Codec:
             except ValueError:
                 pass
         if secret:  # never fall back to a form that would write the value out
-            raise Unwritable("a secret only a plain value under its own key can reference")
+            raise Unwritable("it holds a secret, and only a plain text value can be {$secret: name}")
         entries = p.get("map")
         if isinstance(entries, list):
             for i, entry in enumerate(entries):

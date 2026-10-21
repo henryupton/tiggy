@@ -17,8 +17,18 @@ from tiggy.spec.yamlio import YamlError, load
 
 PLACEHOLDER = "\x00secret:"  # then the name; no spec or export can spell it, so it can't pass for a value
 NAME = re.compile(r"[A-Za-z0-9/_+=.@-]+")  # what GCP and AWS allow between them; each checks its own
-SECRET_WORDS = {"token", "secret", "password", "passwd"}
-SECRET_PAIRS = {("api", "key"), ("private", "key")}
+SECRET_WORDS = {"token", "secret", "password", "passwd", "authorization"}
+SECRET_PAIRS = {
+    ("api", "key"),
+    ("private", "key"),
+    ("secret", "key"),
+    ("signing", "key"),
+    ("access", "token"),
+    ("auth", "token"),
+    ("api", "secret"),
+    ("client", "secret"),
+}
+DISTINCTIVE = 12  # characters; a shorter secret could be an everyday value, so only its credential holds it
 
 
 class SecretError(Exception):
@@ -46,11 +56,19 @@ def is_placeholder(value: Any) -> bool:
 
 
 def secret_bearing(key: Any) -> bool:
-    """Whether a parameter's GTM key names a credential: accessToken, apiSecret, apiKey and the like."""
+    """Whether a GTM key or header name names a credential: accessToken, apiKeys, X-Api-Key and the like."""
     if not isinstance(key, str):
         return False
     words = [w.lower() for w in re.findall(r"[A-Z]+(?![a-z])|[A-Z]?[a-z]+|\d+", key)]
-    return bool(words) and (words[-1] in SECRET_WORDS or tuple(words[-2:]) in SECRET_PAIRS)
+    # Plurals only in pairs: a key ending in tokens alone (maxTokens) is more often a count.
+    return bool(words) and (
+        words[-1] in SECRET_WORDS or (*words[-2:-1], words[-1].removesuffix("s")) in SECRET_PAIRS
+    )
+
+
+def distinctive(value: str) -> bool:
+    """Whether a secret is long enough that finding its value somewhere else means finding the secret."""
+    return len(value) >= DISTINCTIVE
 
 
 @dataclass

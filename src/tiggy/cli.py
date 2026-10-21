@@ -22,7 +22,7 @@ from tiggy.report import plural, printable
 from tiggy.secrets import Fetching, Offline, Resolve, SecretError, Store, is_placeholder, load_targets
 from tiggy.spec import canon
 from tiggy.spec.compiler import Compiled, check_spec, compile_spec
-from tiggy.spec.importer import ImportError_, check, import_version, umask
+from tiggy.spec.importer import ImportError_, check, find_secrets, import_version, umask
 from tiggy.spec.loader import load_spec, looks_like_spec
 from tiggy.spec.problems import Origin, Problem, SpecError
 
@@ -229,8 +229,10 @@ def import_(
         _err(
             printable(f"note: {source} has fields outside the container, not imported: {', '.join(ignored)}")
         )
+    secrets = find_secrets(read.raw_version)  # an object named with a secret is shown without it
     for finding in checks.unmodelled_enums(ContainerGraph(read.export.container_version)):
-        _err(f"{click.style('!', fg='yellow')} {printable(f'{finding.node}: {finding.message}')}")
+        line = secrets.masked(f"{finding.node}: {finding.message}")
+        _err(f"{click.style('!', fg='yellow')} {printable(line)}")
     if check_only:
         _require_spec(spec_dir)
         fetching = Fetching(_store(targets)) if resolve_secrets and targets else None
@@ -275,6 +277,14 @@ def import_(
         )
         for name, where in result.secrets.items():
             _out(f"  {printable(name)}  (from {printable(where)})")
+    if result.shared:
+        _out(
+            "\nThese held another secret's value, and are named apart so a value that only matched by chance "
+            "(a shared placeholder, say) never sends that secret somewhere else. Store the same value, or "
+            "write the value back into the spec if it isn't a secret:"
+        )
+        for name, matched in result.shared.items():
+            _out(f"  {printable(name)}  (the value of {printable(matched)})")
     if result.sidecars:
         _out(f"\nCode files must stay byte-exact. {_precommit_hint(spec_dir)}")
 
