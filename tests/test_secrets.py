@@ -704,7 +704,7 @@ def test_a_token_pasted_into_a_tag_in_the_ui_is_drift_shown_without_its_value(im
 
     assert result.code == 1, result
     assert (
-        "parameter[5].value (<secret meta-capi-purchase-accesstoken> in the container, "
+        "~ tags 'Meta CAPI - Purchase': parameter.accessToken (<secret> in the container, "
         "'{{const - meta api token}}' in the spec)" in result.out
     ), result
     assert TOKEN not in result.out + result.err
